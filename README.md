@@ -67,6 +67,12 @@ Ayrıca: Korku & Açgözlülük endeksi, BTC dominansı, toplam piyasa değeri d
 Linki telefonun tarayıcısında açın → indirilen `KriptoRadar.apk` dosyasına dokunun → "Bilinmeyen uygulamaları yükle" iznini verin → Yükle.
 Link her güncellemede otomatik olarak en son sürümü gösterir (GitHub Actions derler).
 
+### Uygulama içi güncelleme
+Uygulama birkaç saatte bir yeni sürüm olup olmadığını kontrol eder (`version.json`). Yeni sürüm varsa bildirim gönderir ve ekranın üstünde
+**"Şimdi güncelle"** bandı çıkar: APK indirilir, paket adı ve sürüm doğrulanır, Android kurulum ekranı açılır. Elle kontrol: Ayarlar → Uygulama güncelleme.
+Tüm sürümler aynı anahtarla (`keystore/release.jks`) imzalanır; böylece güncellemeler verileriniz silinmeden eski sürümün üzerine kurulur.
+Kendi gizli anahtarınızı kullanmak isterseniz `KEYSTORE_FILE`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` ortam değişkenlerini verin.
+
 ### Kendiniz derleyin
 ```bash
 ./gradlew assembleRelease   # app/build/outputs/apk/release/app-release.apk

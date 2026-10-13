@@ -36,6 +36,7 @@ import com.kriptoradar.data.Prefs
 import com.kriptoradar.ui.Format
 import com.kriptoradar.ui.MainViewModel
 import com.kriptoradar.ui.components.DISCLAIMER
+import com.kriptoradar.ui.components.UpdateSection
 import com.kriptoradar.ui.theme.Accent
 import com.kriptoradar.ui.theme.Muted
 import com.kriptoradar.ui.theme.Up
@@ -49,6 +50,11 @@ fun SettingsScreen(vm: MainViewModel) {
     val ignoringBattery = pm.isIgnoringBatteryOptimizations(ctx.packageName)
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        val upd by vm.update.collectAsStateWithLifecycle()
+        Section("Uygulama güncelleme") {
+            UpdateSection(upd, vm::checkUpdate, vm::downloadUpdate, vm::installUpdate)
+        }
+
         Section("Arka plan izleme") {
             ToggleRow("Sürekli canlı izleme", "Uygulama kapalıyken de tüm piyasa saniyelik izlenir", s.serviceEnabled) { vm.setService(it) }
             Text(

@@ -11,6 +11,8 @@ import com.kriptoradar.data.PriceAlert
 import com.kriptoradar.data.Prefs
 import com.kriptoradar.data.Ticker
 import com.kriptoradar.service.MarketService
+import com.kriptoradar.update.UpdateInfo
+import com.kriptoradar.update.UpdateManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -61,6 +63,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         MarketRepository.acquire()
+        viewModelScope.launch { UpdateManager.check() }
         if (Prefs.settings.value.serviceEnabled) MarketService.start(app)
         // İlk açılışta veya veri eskiyse otomatik tara
         val last = Prefs.scan.value?.at ?: 0
@@ -73,6 +76,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         MarketRepository.release()
         super.onCleared()
     }
+
+    val update = UpdateManager.state
+
+    fun checkUpdate() { viewModelScope.launch { UpdateManager.check() } }
+    fun downloadUpdate(info: UpdateInfo) { viewModelScope.launch { UpdateManager.download(getApplication(), info) } }
+    fun installUpdate() = UpdateManager.install(getApplication())
 
     fun clearSuggestions() = Prefs.clearSuggestions()
 

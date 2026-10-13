@@ -23,20 +23,35 @@ jobs:
         run: ./gradlew testDebugUnitTest --no-daemon
       - name: APK derle
         run: |
+          export VERSION_CODE=$((100 + GITHUB_RUN_NUMBER))
+          export VERSION_NAME="1.2.${GITHUB_RUN_NUMBER}"
           ./gradlew assembleRelease --no-daemon
           cp app/build/outputs/apk/release/app-release.apk KriptoRadar.apk
+          jq -n --argjson code "$VERSION_CODE" --arg name "$VERSION_NAME" \
+                --arg notes "$(git log -1 --pretty=%s)" --arg at "$(date -u +%FT%TZ)" \
+                --arg url "https://github.com/${{ github.repository }}/releases/download/apk/KriptoRadar.apk" \
+                '{versionCode: $code, versionName: $name, notes: $notes, apkUrl: $url, publishedAt: $at}' > version.json
+          cat version.json
       - name: APK'yı yükle (Actions)
         uses: actions/upload-artifact@v4
         with:
           name: KriptoRadar-apk
-          path: KriptoRadar.apk
+          path: |
+            KriptoRadar.apk
+            version.json
       - name: İndirme linkini güncelle (Release)
         if: github.ref_name == github.event.repository.default_branch
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete apk --yes --cleanup-tag || true
-          gh release create apk KriptoRadar.apk \
-            --target "$GITHUB_SHA" \
-            --title "Kripto Radar (son sürüm)" \
-            --notes "Telefondan indirip kurun: https://github.com/${{ github.repository }}/releases/download/apk/KriptoRadar.apk  — Commit: ${GITHUB_SHA::7}"
+          # Önce APK, sonra version.json: uygulama yeni sürümü görmeden APK hazır olur
+          if gh release view apk > /dev/null 2>&1; then
+            gh release upload apk KriptoRadar.apk --clobber
+            gh release upload apk version.json --clobber
+            gh release edit apk --title "Kripto Radar $(jq -r .versionName version.json)" \
+              --notes "Telefondan indirip kurun: https://github.com/${{ github.repository }}/releases/download/apk/KriptoRadar.apk — $(jq -r .notes version.json)"
+          else
+            gh release create apk KriptoRadar.apk version.json --target "$GITHUB_SHA" \
+              --title "Kripto Radar $(jq -r .versionName version.json)" \
+              --notes "Telefondan indirip kurun: https://github.com/${{ github.repository }}/releases/download/apk/KriptoRadar.apk"
+          fi

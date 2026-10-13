@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kriptoradar.data.ConnState
+import com.kriptoradar.ui.components.UpdateBanner
 import com.kriptoradar.ui.screens.AlertsScreen
 import com.kriptoradar.ui.screens.CoinDetailScreen
 import com.kriptoradar.ui.screens.MarketScreen
@@ -79,9 +81,13 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(i: Intent?) {
         i?.getStringExtra(EXTRA_SYMBOL)?.let { openSymbol.value = it }
+        if (i?.getBooleanExtra(EXTRA_UPDATE, false) == true) vm.checkUpdate()
     }
 
-    companion object { const val EXTRA_SYMBOL = "symbol" }
+    companion object {
+        const val EXTRA_SYMBOL = "symbol"
+        const val EXTRA_UPDATE = "update"
+    }
 }
 
 private enum class Tab(val label: String) { MARKET("Piyasa"), SIGNALS("Sinyaller"), ALERTS("Alarmlar"), SETTINGS("Ayarlar") }
@@ -122,12 +128,16 @@ private fun App(vm: MainViewModel, detail: String?, setDetail: (String?) -> Unit
             }
         },
     ) { pad ->
-        Box(Modifier.padding(pad).fillMaxSize()) {
-            when (tab) {
-                Tab.MARKET -> MarketScreen(vm, onOpen = setDetail)
-                Tab.SIGNALS -> SignalsScreen(vm, onOpen = setDetail)
-                Tab.ALERTS -> AlertsScreen(vm)
-                Tab.SETTINGS -> SettingsScreen(vm)
+        val upd by vm.update.collectAsStateWithLifecycle()
+        Column(Modifier.padding(pad).fillMaxSize()) {
+            if (tab != Tab.SETTINGS) UpdateBanner(upd, vm::downloadUpdate, vm::installUpdate)
+            Box(Modifier.weight(1f).fillMaxSize()) {
+                when (tab) {
+                    Tab.MARKET -> MarketScreen(vm, onOpen = setDetail)
+                    Tab.SIGNALS -> SignalsScreen(vm, onOpen = setDetail)
+                    Tab.ALERTS -> AlertsScreen(vm)
+                    Tab.SETTINGS -> SettingsScreen(vm)
+                }
             }
         }
     }

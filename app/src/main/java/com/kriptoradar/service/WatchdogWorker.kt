@@ -11,6 +11,7 @@ import androidx.work.WorkerParameters
 import com.kriptoradar.alerts.AlertEngine
 import com.kriptoradar.data.MarketRepository
 import com.kriptoradar.data.Prefs
+import com.kriptoradar.update.UpdateManager
 import java.util.concurrent.TimeUnit
 
 /**
@@ -20,6 +21,7 @@ import java.util.concurrent.TimeUnit
 class WatchdogWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
         Prefs.init(applicationContext)
+        runCatching { UpdateManager.checkInBackground(applicationContext) }
         val s = Prefs.settings.value
         if (!s.serviceEnabled) return Result.success()
         if (MarketService.running) return Result.success()

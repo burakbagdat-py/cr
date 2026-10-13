@@ -13,8 +13,21 @@ android {
         applicationId = "com.kriptoradar"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        // CI her derlemede artan sürüm numarası verir; uygulama içi güncelleme bunu karşılaştırır.
+        versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 2
+        versionName = System.getenv("VERSION_NAME") ?: "1.1.0"
+    }
+
+    signingConfigs {
+        // Güncellemelerin eski sürümün üzerine kurulabilmesi için tüm sürümler aynı anahtarla imzalanmalı.
+        // Varsayılan olarak repodaki anahtar kullanılır; GitHub Secrets ile kendi anahtarınızı verebilirsiniz.
+        create("release") {
+            val custom = System.getenv("KEYSTORE_FILE")
+            storeFile = if (custom != null) file(custom) else rootProject.file("keystore/release.jks")
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "kriptoradar"
+            keyAlias = System.getenv("KEY_ALIAS") ?: "kriptoradar"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "kriptoradar"
+        }
     }
 
     buildTypes {
@@ -22,8 +35,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Kendi anahtarınız yoksa debug anahtarıyla imzalanır (yan yükleme için yeterli).
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -36,6 +48,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     lint {
         // Lint uyarıları raporlanır ama APK üretimini durdurmaz

@@ -20,6 +20,7 @@ object Notifier {
     const val CH_MOVE = "moves"
     const val CH_SIGNAL = "signals"
     const val CH_REVERSAL = "reversal"
+    const val CH_UPDATE = "updates"
     const val LIVE_ID = 1
 
     fun createChannels(ctx: Context) {
@@ -37,18 +38,22 @@ object Notifier {
             NotificationChannel(CH_REVERSAL, "Dip dönüş adayları", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "Çok düşmüş ama yükselişe dönme eğilimi gösteren coinler (tavsiye değildir)"
             },
+            NotificationChannel(CH_UPDATE, "Uygulama güncellemeleri", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "Yeni sürüm yayınlandığında"
+            },
             NotificationChannel(CH_SIGNAL, "İstatistiksel sinyaller", NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = "Teknik skoru eşiği geçen coinler (tavsiye değildir)"
             },
         ))
     }
 
-    fun openAppIntent(ctx: Context, symbol: String? = null): PendingIntent {
+    fun openAppIntent(ctx: Context, symbol: String? = null, update: Boolean = false): PendingIntent {
         val i = Intent(ctx, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             if (symbol != null) putExtra(MainActivity.EXTRA_SYMBOL, symbol)
+            if (update) putExtra(MainActivity.EXTRA_UPDATE, true)
         }
-        return PendingIntent.getActivity(ctx, symbol?.hashCode() ?: 0, i,
+        return PendingIntent.getActivity(ctx, if (update) 3001 else symbol?.hashCode() ?: 0, i,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 
@@ -66,7 +71,7 @@ object Notifier {
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setWhen(System.currentTimeMillis()).setShowWhen(true)
             .setAutoCancel(true)
-            .setContentIntent(openAppIntent(ctx, symbol))
+            .setContentIntent(openAppIntent(ctx, symbol, update = channel == CH_UPDATE))
             .build()
         try { NotificationManagerCompat.from(ctx).notify(id, n) } catch (_: SecurityException) {}
     }
