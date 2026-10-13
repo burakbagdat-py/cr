@@ -66,7 +66,15 @@ data class Settings(
     val volumeSpikeNotify: Boolean = true,
     val volumeSpikeRatio: Double = 4.0,
     val alertCooldownMin: Int = 30,
-)
+    /** Bildirimleri arkadaş ağzıyla ("kanka ... amk") yaz. */
+    val casualMode: Boolean = false,
+    /** Otomatik bildirimleri sadece seçili coinler için gönder. */
+    val onlySelectedCoins: Boolean = false,
+    /** Seçili coinler (BTC, ETH gibi taban sembolleri). */
+    val notifyCoins: Set<String> = emptySet(),
+) {
+    fun allows(base: String) = !onlySelectedCoins || base in notifyCoins
+}
 
 @Serializable
 data class Factor(val name: String, val score: Double, val detail: String)

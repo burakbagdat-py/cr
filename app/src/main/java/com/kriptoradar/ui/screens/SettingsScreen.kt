@@ -6,6 +6,11 @@ import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings as AndroidSettings
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -53,6 +58,27 @@ fun SettingsScreen(vm: MainViewModel) {
         val upd by vm.update.collectAsStateWithLifecycle()
         Section("Uygulama güncelleme") {
             UpdateSection(upd, vm::checkUpdate, vm::downloadUpdate, vm::installUpdate)
+        }
+
+        Section("Bildirim tarzı") {
+            ToggleRow("😎 Kanka modu", "Bildirimler resmi değil, arkadaş ağzıyla gelir", s.casualMode) { v -> Prefs.updateSettings { it.copy(casualMode = v) } }
+            Text(
+                if (s.casualMode) "Örnek: \"🚀 Kanka BTC uçuyo amk! – 5 dakikada %3,20 artmış…\"\n\"🔻 Kanka SOL batıyo amk! – Elinde varsa stop'unu kontrol et, istersen çık.\""
+                else "Örnek: \"🚀 BTC 5 dk'da %3,20 – BTC/USDT 84.120,00 • 24s %4,10\"",
+                fontSize = 12.sp, color = Muted,
+            )
+            OutlinedButton(onClick = {
+                val (title, text) = if (s.casualMode) com.kriptoradar.alerts.Voice.rapidMove("BTC", true, 3.2, 5, "84.120,00 USDT", 4.1)
+                else "🚀 BTC 5 dk'da %3,20" to "BTC/USDT 84.120,00 • 24s %4,10 (test bildirimi)"
+                com.kriptoradar.alerts.Notifier.post(ctx, com.kriptoradar.alerts.Notifier.CH_MOVE, 9999, title, text, "BTCUSDT")
+            }) { Text("Test bildirimi gönder") }
+        }
+
+        Section("Hangi coinler için bildirim?") {
+            ToggleRow("Sadece seçtiğim coinler", "Ani hareket, sinyal, dip dönüş ve hacim bildirimleri sadece aşağıdaki coinler için gelir. Fiyat alarmların her zaman çalışır.", s.onlySelectedCoins) { v ->
+                Prefs.updateSettings { it.copy(onlySelectedCoins = v) }
+            }
+            CoinPicker(vm, s.notifyCoins, enabled = s.onlySelectedCoins)
         }
 
         Section("Arka plan izleme") {
@@ -137,5 +163,40 @@ private fun SliderRow(title: String, value: Float, range: ClosedFloatingPointRan
             Text(label(v), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
         Slider(value = v, onValueChange = { v = it }, valueRange = range, onValueChangeFinished = { onDone(v) })
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CoinPicker(vm: MainViewModel, selected: Set<String>, enabled: Boolean) {
+    val tickers by vm.tickers.collectAsStateWithLifecycle()
+    val favs by vm.favorites.collectAsStateWithLifecycle()
+    var q by remember { mutableStateOf("") }
+    fun toggle(base: String) = Prefs.updateSettings { st ->
+        st.copy(notifyCoins = if (base in st.notifyCoins) st.notifyCoins - base else st.notifyCoins + base)
+    }
+    val suggestions = remember(q, tickers.size) {
+        val qq = q.trim().uppercase()
+        if (qq.isEmpty()) emptyList()
+        else tickers.values.filter { it.quote == "USDT" && it.base.startsWith(qq) && com.kriptoradar.data.BinanceApi.isTradable(it.base) }
+            .sortedByDescending { it.quoteVolume }.map { it.base }.distinct().take(6)
+    }
+    Column(Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.5f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (enabled && selected.isEmpty()) Text("⚠ Hiç coin seçmedin; otomatik bildirim gelmez.", fontSize = 12.sp, color = Accent)
+        Text("Seçili (${selected.size}) – kaldırmak için dokun:", fontSize = 12.sp)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            selected.sorted().forEach { b -> FilterChip(selected = true, onClick = { toggle(b) }, label = { Text("$b ✕") }) }
+        }
+        OutlinedTextField(q, { q = it }, Modifier.fillMaxWidth(), label = { Text("Coin ekle (BTC, ETH…)") }, singleLine = true)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            suggestions.forEach { b -> FilterChip(selected = b in selected, onClick = { toggle(b); q = "" }, label = { Text(b) }) }
+        }
+        val favBases = favs.mapNotNull { tickers[it]?.base ?: com.kriptoradar.data.BinanceApi.splitSymbol(it)?.first }.distinct()
+        if (favBases.any { it !in selected }) {
+            Text("Favorilerinden hızlı ekle:", fontSize = 12.sp, color = Muted)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                favBases.filter { it !in selected }.forEach { b -> FilterChip(selected = false, onClick = { toggle(b) }, label = { Text("+ $b") }) }
+            }
+        }
     }
 }
