@@ -3,7 +3,12 @@ package com.kriptoradar.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.kriptoradar.alerts.PaperExecutor
 import com.kriptoradar.alerts.ScanRunner
+import com.kriptoradar.data.OrderKind
+import com.kriptoradar.data.PaperEngine
+import com.kriptoradar.data.PaperOrder
+import com.kriptoradar.data.PaperPortfolio
 import com.kriptoradar.data.AlertType
 import com.kriptoradar.data.BinanceApi
 import com.kriptoradar.data.MarketRepository
@@ -63,6 +68,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         MarketRepository.acquire()
+        // Servis kapalıyken de sanal emirler uygulama açıkken çalışsın
+        viewModelScope.launch(Dispatchers.Default) {
+            MarketRepository.updates.collect { if (!MarketService.running) PaperExecutor.onTicks(getApplication()) }
+        }
         viewModelScope.launch { UpdateManager.check() }
         if (Prefs.settings.value.serviceEnabled) MarketService.start(app)
         // İlk açılışta veya veri eskiyse otomatik tara
@@ -91,40 +100,54 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun usdTry(): Double? = tickers.value["USDTTRY"]?.price
 
-    /** Sanal portföyde TL ile al. Başarısızsa hata mesajı döner. */
+    // ---------------- Sanal portföy ----------------
+    fun paperPrices(): Map<String, Double> = PaperExecutor.pricesTry(tickers.value)
+    fun priceTry(symbol: String): Double? = tickers.value[symbol]?.let { t -> usdTry()?.let { t.price * it } }
+
+    /** Portföy işlemi uygular; hata varsa mesajını döndürür. */
+    private fun paperOp(f: (PaperPortfolio) -> PaperPortfolio): String? = try {
+        Prefs.updatePaper(f); null
+    } catch (e: PaperEngine.PaperException) { e.message } catch (e: Exception) { "Hata: ${e.message}" }
+
     fun paperBuy(symbol: String, amountTry: Double): String? {
         val t = tickers.value[symbol] ?: return "Fiyat bulunamadı"
-        val rate = usdTry() ?: return "Dolar/TL kuru alınamadı"
-        val p = paper.value
-        if (amountTry <= 0) return "Tutar girin"
-        if (amountTry > p.cash + 1e-6) return "Sanal bakiyen yetersiz (${Format.num(p.cash)} TL)"
-        val qty = com.kriptoradar.analysis.Simulator.qtyFor(amountTry, t.price * rate, p.feePct)
-        Prefs.updatePaper {
-            it.copy(cash = it.cash - amountTry, positions = it.positions + com.kriptoradar.data.PaperPosition(
-                System.currentTimeMillis(), symbol, t.base, qty, t.price, rate, amountTry, System.currentTimeMillis()))
-        }
-        return null
+        val price = priceTry(symbol) ?: return "Dolar/TL kuru alınamadı"
+        return paperOp { PaperEngine.buy(it, symbol, t.base, price, amountTry) }
     }
 
-    fun paperValue(pos: com.kriptoradar.data.PaperPosition): Double? {
-        val t = tickers.value[pos.symbol] ?: return null
-        val rate = usdTry() ?: return null
-        return pos.qty * t.price * rate * (1 - paper.value.feePct / 100)
+    fun paperSell(symbol: String, fraction: Double): String? {
+        val price = priceTry(symbol) ?: return "Fiyat bulunamadı"
+        return paperOp { PaperEngine.sell(it, symbol, fraction, price) }
     }
 
-    fun paperSell(id: Long) {
-        val pos = paper.value.positions.firstOrNull { it.id == id } ?: return
-        val v = paperValue(pos) ?: return
-        Prefs.updatePaper {
-            it.copy(
-                cash = it.cash + v,
-                positions = it.positions.filterNot { p -> p.id == id },
-                closed = (listOf(com.kriptoradar.data.PaperClosed(pos.base, pos.investedTry, v, pos.at, System.currentTimeMillis())) + it.closed).take(100),
-            )
-        }
+    fun paperOrder(symbol: String, kind: OrderKind, triggerTry: Double, amountTry: Double, fraction: Double): String? {
+        val t = tickers.value[symbol] ?: return "Coin bulunamadı"
+        return paperOp { PaperEngine.placeOrder(it, PaperOrder(0, symbol, t.base, kind, triggerTry, amountTry, fraction, System.currentTimeMillis())) }
     }
 
-    fun paperReset(startCash: Double) = Prefs.updatePaper { com.kriptoradar.data.PaperPortfolio(startCash = startCash, cash = startCash, feePct = it.feePct) }
+    fun paperCancel(id: Long) = paperOp { PaperEngine.cancelOrder(it, id) }
+    fun paperDeposit(amount: Double, note: String = "") = paperOp { PaperEngine.deposit(it, amount, note) }
+    fun paperWithdraw(amount: Double) = paperOp { PaperEngine.withdraw(it, amount) }
+    fun paperSetCash(v: Double) = paperOp { PaperEngine.setCash(it, v) }
+    fun paperGrant(symbol: String, qty: Double): String? {
+        val t = tickers.value[symbol] ?: return "Coin bulunamadı"
+        val price = priceTry(symbol) ?: return "Fiyat yok"
+        return paperOp { PaperEngine.grant(it, symbol, t.base, qty, price) }
+    }
+    fun paperRemove(symbol: String) = paperOp { PaperEngine.removeHolding(it, symbol, priceTry(symbol)) }
+    fun paperFees(feePct: Double, slippagePct: Double) = paperOp { it.copy(feePct = feePct.coerceIn(0.0, 5.0), slippagePct = slippagePct.coerceIn(0.0, 5.0)) }
+    fun paperClearLedger() = paperOp { it.copy(ledger = emptyList(), equity = emptyList()) }
+    fun paperCancelAll() = paperOp { it.copy(orders = emptyList()) }
+    fun paperReset(startCash: Double) = paperOp { PaperEngine.reset(it, startCash) }
+
+    // ---------------- Admin ----------------
+    private val _adminUnlocked = MutableStateFlow(false)
+    val adminUnlocked: StateFlow<Boolean> = _adminUnlocked
+    fun hasAdminPin() = Prefs.hasAdminPin()
+    fun unlockAdmin(pin: String): Boolean = Prefs.checkAdminPin(pin).also { _adminUnlocked.value = it }
+    fun setAdminPin(pin: String) { Prefs.setAdminPin(pin); _adminUnlocked.value = true }
+    fun lockAdmin() { _adminUnlocked.value = false }
+    fun openAdmin() { navRequest.value = "admin" }
 
     fun checkUpdate() { viewModelScope.launch { UpdateManager.check() } }
     fun downloadUpdate(info: UpdateInfo) { viewModelScope.launch { UpdateManager.download(getApplication(), info) } }

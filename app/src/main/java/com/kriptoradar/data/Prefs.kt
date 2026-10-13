@@ -41,7 +41,7 @@ object Prefs {
         _alerts.value = read("alerts", ListSerializer(PriceAlert.serializer())) ?: emptyList()
         _favorites.value = read("favorites", SetSerializer(String.serializer())) ?: _favorites.value
         _scan.value = read("scan", ScanResult.serializer())
-        _paper.value = read("paper", PaperPortfolio.serializer()) ?: PaperPortfolio()
+        _paper.value = PaperEngine.migrate(read("paper", PaperPortfolio.serializer()) ?: PaperPortfolio())
         _readLessons.value = read("read_lessons", SetSerializer(String.serializer())) ?: emptySet()
         _suggestions.value = read("suggestions", ListSerializer(SuggestionRecord.serializer())) ?: emptyList()
     }
@@ -90,6 +90,45 @@ object Prefs {
 
     fun clearSuggestions() {
         _suggestions.value = emptyList(); write("suggestions", ListSerializer(SuggestionRecord.serializer()), emptyList())
+    }
+
+    // ---------------- Admin PIN (SHA-256 ile saklanır) ----------------
+    private fun hash(pin: String): String {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        return md.digest(("kriptoradar:" + pin).toByteArray()).joinToString("") { "%02x".format(it) }
+    }
+    fun hasAdminPin() = sp.getString("admin_pin", null) != null
+    fun setAdminPin(pin: String) = sp.edit().putString("admin_pin", hash(pin)).apply()
+    fun checkAdminPin(pin: String) = sp.getString("admin_pin", null) == hash(pin)
+
+    // ---------------- Yedekleme ----------------
+    @kotlinx.serialization.Serializable
+    data class Backup(
+        val version: Int = 1,
+        val settings: Settings,
+        val alerts: List<PriceAlert>,
+        val favorites: Set<String>,
+        val paper: PaperPortfolio,
+        val suggestions: List<SuggestionRecord>,
+    )
+
+    fun exportJson(): String = json.encodeToString(Backup.serializer(),
+        Backup(settings = _settings.value, alerts = _alerts.value, favorites = _favorites.value, paper = _paper.value, suggestions = _suggestions.value))
+
+    fun importJson(text: String) {
+        val b = json.decodeFromString(Backup.serializer(), text.trim())
+        updateSettings { b.settings }
+        updateAlerts { b.alerts }
+        _favorites.value = b.favorites; write("favorites", SetSerializer(String.serializer()), b.favorites)
+        updatePaper { PaperEngine.migrate(b.paper) }
+        _suggestions.value = b.suggestions; write("suggestions", ListSerializer(SuggestionRecord.serializer()), b.suggestions)
+    }
+
+    /** Bildirim bekleme sürelerini sıfırla (aynı olaylar tekrar bildirilebilir). */
+    fun clearCooldowns() {
+        val e = sp.edit()
+        sp.all.keys.filter { it.startsWith("n_") && !it.startsWith("n_update") }.forEach { e.remove(it) }
+        e.apply()
     }
 
     /** Bildirim bekleme süresi takibi (aynı olay için tekrar tekrar bildirim gitmesin). */

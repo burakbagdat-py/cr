@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kriptoradar.data.ConnState
 import com.kriptoradar.ui.components.UpdateBanner
+import com.kriptoradar.ui.screens.AdminScreen
 import com.kriptoradar.ui.screens.AlertsScreen
 import com.kriptoradar.ui.screens.CoinDetailScreen
 import com.kriptoradar.ui.screens.LearnScreen
@@ -103,14 +104,16 @@ private enum class Tab(val label: String) { LEARN("Rehber"), MARKET("Piyasa"), S
 @Composable
 private fun App(vm: MainViewModel, detail: String?, setDetail: (String?) -> Unit) {
     var tab by rememberSaveable { mutableStateOf(Tab.LEARN) }
-    var settings by rememberSaveable { mutableStateOf(false) }
+    var overlay by rememberSaveable { mutableStateOf<String?>(null) } // "settings" | "admin"
+    val settings = overlay != null
     val nav by vm.navRequest.collectAsStateWithLifecycle()
     LaunchedEffect(nav) {
-        if (nav == "sim") { tab = Tab.SIM; settings = false; setDetail(null) }
+        if (nav == "sim") { tab = Tab.SIM; overlay = null; setDetail(null) }
+        if (nav == "admin") { overlay = "admin"; setDetail(null) }
         if (nav != null) vm.navRequest.value = null
     }
     BackHandler(enabled = detail != null) { setDetail(null) }
-    BackHandler(enabled = detail == null && settings) { settings = false }
+    BackHandler(enabled = detail == null && settings) { overlay = if (overlay == "admin") "settings" else null }
 
     if (detail != null) {
         CoinDetailScreen(vm, detail, onBack = { setDetail(null) })
@@ -119,13 +122,13 @@ private fun App(vm: MainViewModel, detail: String?, setDetail: (String?) -> Unit
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (settings) "Ayarlar" else "Kripto Radar", fontWeight = FontWeight.Bold) },
+                title = { Text(when (overlay) { "settings" -> "Ayarlar"; "admin" -> "Admin Paneli"; else -> "Kripto Radar" }, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    if (settings) IconButton(onClick = { settings = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri") }
+                    if (settings) IconButton(onClick = { overlay = if (overlay == "admin") "settings" else null }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri") }
                 },
                 actions = {
                     ConnBadge(vm)
-                    if (!settings) IconButton(onClick = { settings = true }) { Icon(Icons.Default.Settings, "Ayarlar") }
+                    if (!settings) IconButton(onClick = { overlay = "settings" }) { Icon(Icons.Default.Settings, "Ayarlar") }
                 },
             )
         },
@@ -133,7 +136,7 @@ private fun App(vm: MainViewModel, detail: String?, setDetail: (String?) -> Unit
             NavigationBar {
                 Tab.entries.forEach { t ->
                     NavigationBarItem(
-                        selected = tab == t && !settings, onClick = { tab = t; settings = false },
+                        selected = tab == t && !settings, onClick = { tab = t; overlay = null },
                         icon = {
                             Icon(when (t) {
                                 Tab.LEARN -> Icons.Default.Info
@@ -153,7 +156,8 @@ private fun App(vm: MainViewModel, detail: String?, setDetail: (String?) -> Unit
         Column(Modifier.padding(pad).fillMaxSize()) {
             if (!settings) UpdateBanner(upd, vm::downloadUpdate, vm::installUpdate)
             Box(Modifier.weight(1f).fillMaxSize()) {
-                if (settings) SettingsScreen(vm) else when (tab) {
+                if (overlay == "admin") AdminScreen(vm)
+                else if (overlay == "settings") SettingsScreen(vm, openAdmin = { overlay = "admin" }) else when (tab) {
                     Tab.LEARN -> LearnScreen(vm, onOpen = setDetail)
                     Tab.MARKET -> MarketScreen(vm, onOpen = setDetail)
                     Tab.SIGNALS -> SignalsScreen(vm, onOpen = setDetail)

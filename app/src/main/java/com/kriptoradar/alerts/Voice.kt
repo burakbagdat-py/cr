@@ -69,4 +69,12 @@ object Voice {
     fun volumeSpike(base: String, ratio: Double, ch: Double) =
         pick("👀 Kanka $base tarafında bi şeyler oluyo", "📈 Kanka herkes $base almaya dalmış") to
             "Hacim normalin ${Format.num(ratio)} katı amk. 24 saatte ${Format.signedPct(ch)}. Bi göz at."
+
+    fun paperExecuted(base: String, kind: com.kriptoradar.data.OrderKind, pnl: Double, price: String): Pair<String, String> = when (kind) {
+        com.kriptoradar.data.OrderKind.LIMIT_BUY -> pick("🛒 Kanka sanal $base aldık", "🛒 Kanka emrin çalıştı, $base alındı") to "Fiyat $price TL'ye indi, emrin gerçekleşti."
+        com.kriptoradar.data.OrderKind.STOP_LOSS -> pick("🛑 Kanka zarar-kes patladı", "🛑 Kanka $base satıldı, kaçtık") to
+            "$base $price TL'den satıldı, ${Format.num(pnl)} TL. Daha kötüsünden kurtardı amk (sanal)."
+        else -> (if (pnl >= 0) pick("🎯 Kanka kârı aldık!", "💰 Kanka $base sattık, para cepte") else "💱 Kanka $base satıldı") to
+            "$base $price TL'den satıldı, ${if (pnl >= 0) "+" else ""}${Format.num(pnl)} TL (sanal)."
+    }
 }

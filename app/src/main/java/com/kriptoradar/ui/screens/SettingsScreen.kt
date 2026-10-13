@@ -48,13 +48,18 @@ import com.kriptoradar.ui.theme.Up
 
 @SuppressLint("BatteryLife")
 @Composable
-fun SettingsScreen(vm: MainViewModel) {
+fun SettingsScreen(vm: MainViewModel, openAdmin: () -> Unit = {}) {
     val s by vm.settings.collectAsStateWithLifecycle()
     val ctx = LocalContext.current
     val pm = ctx.getSystemService(PowerManager::class.java)
     val ignoringBattery = pm.isIgnoringBatteryOptimizations(ctx.packageName)
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Section("🛠 Admin paneli") {
+            Text("Sanal para yükle/çek, coin ekle-sil, komisyon ayarı, yedekleme, sistem durumu. PIN ile korunur.", fontSize = 12.sp, color = Muted)
+            Button(onClick = openAdmin) { Text("Admin panelini aç") }
+        }
+
         val upd by vm.update.collectAsStateWithLifecycle()
         Section("Uygulama güncelleme") {
             UpdateSection(upd, vm::checkUpdate, vm::downloadUpdate, vm::installUpdate)

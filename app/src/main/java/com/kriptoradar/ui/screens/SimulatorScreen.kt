@@ -67,7 +67,7 @@ fun SimulatorScreen(vm: MainViewModel, onOpen: (String) -> Unit) {
         }
         when (tab) {
             SimTab.CALC -> CalcTab(vm) { tab = SimTab.PAPER }
-            SimTab.PAPER -> PaperTab(vm, onOpen) { tab = SimTab.CALC }
+            SimTab.PAPER -> PortfolioTab(vm, onOpen)
         }
     }
 }
@@ -284,86 +284,4 @@ private fun RangeBar(lo: Double, mid: Double, hi: Double, invested: Double) {
         }
     }
     Text("Beyaz çizgi: yatırdığın tutar", fontSize = 10.sp, color = Muted)
-}
-
-@Composable
-private fun PaperTab(vm: MainViewModel, onOpen: (String) -> Unit, goCalc: () -> Unit) {
-    val p by vm.paper.collectAsStateWithLifecycle()
-    val tickers by vm.tickers.collectAsStateWithLifecycle() // canlı değer için yeniden çiz
-    var resetDialog by remember { mutableStateOf(false) }
-    val values = p.positions.map { it to vm.paperValue(it) }
-    val posValue = values.sumOf { it.second ?: it.first.investedTry }
-    val total = p.cash + posValue
-    val pnl = total - p.startCash
-    @Suppress("UNUSED_VARIABLE") val tick = tickers.size
-
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        item {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(14.dp)) {
-                    Text("🎮 Sanal Portföy", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text("Gerçek para yok. ${Format.num(p.startCash)} sanal TL ile başla, alıp sat, sonuçları canlı gör. Gerçek paraya geçmeden önce kendini test etmenin en iyi yolu.",
-                        fontSize = 12.sp, color = Muted)
-                    Spacer(Modifier.height(8.dp))
-                    Text("Toplam değer", fontSize = 11.sp, color = Muted)
-                    Text(Format.num(total) + " TL", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = changeColor(pnl))
-                    Text("${if (pnl >= 0) "Kâr" else "Zarar"}: ${if (pnl >= 0) "+" else ""}${Format.num(pnl)} TL (${Format.signedPct(pnl / p.startCash * 100)})", color = changeColor(pnl))
-                    Text("Nakit: ${Format.num(p.cash)} TL • Coinlerde: ${Format.num(posValue)} TL • Komisyon %${Format.num(p.feePct)}", fontSize = 12.sp, color = Muted)
-                    Row {
-                        TextButton(onClick = goCalc) { Text("Coin al") }
-                        TextButton(onClick = { resetDialog = true }) { Text("Sıfırla") }
-                    }
-                }
-            }
-        }
-        if (p.positions.isEmpty()) item {
-            Text("Henüz sanal coinin yok. \"Ne olurdu?\" sekmesinde bir coin ve tutar seçip \"Sanal portföyde dene\"ye dokun.", color = Muted, fontSize = 13.sp)
-        }
-        items(values, key = { it.first.id }) { (pos, v) ->
-            val ppnl = (v ?: pos.investedTry) - pos.investedTry
-            Card(Modifier.fillMaxWidth().clickable { onOpen(pos.symbol) }) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("${Format.price(pos.qty)} ${pos.base}", fontWeight = FontWeight.Bold)
-                        Text("Yatırılan ${Format.num(pos.investedTry)} TL • ${Format.ago(pos.at)}", fontSize = 11.sp, color = Muted)
-                        Text("Şimdi: ${v?.let { Format.num(it) + " TL" } ?: "—"}  (${if (ppnl >= 0) "+" else ""}${Format.num(ppnl)} TL)", fontSize = 12.sp, color = changeColor(ppnl))
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        PctPill(ppnl / pos.investedTry * 100)
-                        TextButton(onClick = { vm.paperSell(pos.id) }) { Text("Sat") }
-                    }
-                }
-            }
-        }
-        if (p.closed.isNotEmpty()) {
-            item {
-                val wins = p.closed.count { it.pnl > 0 }
-                Text("Kapanan işlemler: ${p.closed.size} • kârlı: $wins • toplam ${if (p.closed.sumOf { it.pnl } >= 0) "+" else ""}${Format.num(p.closed.sumOf { it.pnl })} TL",
-                    fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
-            }
-            items(p.closed.take(30), key = { "c" + it.closedAt }) { c ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    Text("${c.base} • ${Format.ago(c.closedAt)}", Modifier.weight(1f), fontSize = 13.sp)
-                    Text((if (c.pnl >= 0) "+" else "") + Format.num(c.pnl) + " TL", color = changeColor(c.pnl), fontSize = 13.sp)
-                }
-            }
-        }
-    }
-
-    if (resetDialog) {
-        var start by remember { mutableStateOf(p.startCash.toInt().toString()) }
-        AlertDialog(
-            onDismissRequest = { resetDialog = false },
-            title = { Text("Sanal portföyü sıfırla") },
-            text = {
-                Column {
-                    Text("Tüm sanal coinler ve geçmiş silinir.", fontSize = 13.sp)
-                    OutlinedTextField(start, { start = it }, label = { Text("Başlangıç bakiyesi (TL)") }, singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                }
-            },
-            confirmButton = { Button(onClick = { vm.paperReset(start.toDoubleOrNull()?.coerceIn(100.0, 10_000_000.0) ?: 10_000.0); resetDialog = false }) { Text("Sıfırla") } },
-            dismissButton = { TextButton(onClick = { resetDialog = false }) { Text("İptal") } },
-        )
-    }
 }

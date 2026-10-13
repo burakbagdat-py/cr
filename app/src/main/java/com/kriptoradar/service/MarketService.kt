@@ -12,6 +12,7 @@ import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.kriptoradar.alerts.AlertEngine
 import com.kriptoradar.alerts.Notifier
+import com.kriptoradar.alerts.PaperExecutor
 import com.kriptoradar.alerts.ScanRunner
 import com.kriptoradar.data.ConnState
 import com.kriptoradar.data.MarketRepository
@@ -45,7 +46,10 @@ class MarketService : LifecycleService() {
         MarketRepository.acquire()
 
         lifecycleScope.launch(Dispatchers.Default) {
-            MarketRepository.updates.collect { engine.onTicks(it) }
+            MarketRepository.updates.collect {
+                engine.onTicks(it)
+                PaperExecutor.onTicks(this@MarketService)
+            }
         }
         lifecycleScope.launch { liveNotificationLoop() }
         lifecycleScope.launch(Dispatchers.Default) { scanLoop() }
