@@ -16,7 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material3.Card
+import com.kriptoradar.ui.components.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -47,6 +47,7 @@ import com.kriptoradar.data.Signal
 import com.kriptoradar.ui.Format
 import com.kriptoradar.ui.MainViewModel
 import com.kriptoradar.ui.components.CandleChart
+import com.kriptoradar.ui.components.RollingText
 import com.kriptoradar.ui.components.DISCLAIMER
 import com.kriptoradar.ui.components.ScoreBadge
 import com.kriptoradar.ui.theme.Accent
@@ -91,8 +92,9 @@ fun CoinDetailScreen(vm: MainViewModel, symbol: String, onBack: () -> Unit) {
         analysisError = res.isFailure || signal == null
     }
 
-    Scaffold(topBar = {
+    Scaffold(containerColor = androidx.compose.ui.graphics.Color.Transparent, topBar = {
         TopAppBar(
+            colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
             title = { Text(t?.let { "${it.base}/${it.quote}" } ?: symbol, fontWeight = FontWeight.Bold) },
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri") } },
             actions = {
@@ -107,7 +109,12 @@ fun CoinDetailScreen(vm: MainViewModel, symbol: String, onBack: () -> Unit) {
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
             if (t != null) {
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text(Format.price(t.price), fontSize = 30.sp, fontWeight = FontWeight.Bold, color = changeColor(t.change24hPct))
+                    // Kayan rakamlı canlı fiyat
+                    val prevPrice = remember(symbol) { mutableStateOf(t.price) }
+                    val up = t.price >= prevPrice.value
+                    LaunchedEffect(t.price) { prevPrice.value = t.price }
+                    RollingText(Format.price(t.price), style = androidx.compose.ui.text.TextStyle(fontSize = 32.sp, fontWeight = FontWeight.Bold),
+                        color = changeColor(t.change24hPct), up = up)
                     Spacer(Modifier.width(8.dp))
                     Text(Format.signedPct(t.change24hPct), color = changeColor(t.change24hPct), modifier = Modifier.padding(bottom = 5.dp))
                 }
@@ -140,7 +147,7 @@ fun CoinDetailScreen(vm: MainViewModel, symbol: String, onBack: () -> Unit) {
             Row(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 intervals.forEach { (k, l) -> FilterChip(selected = interval == k, onClick = { interval = k }, label = { Text(l) }) }
             }
-            CandleChart(klines, ema)
+            CandleChart(klines, ema, animKey = interval)
             Text("Sarı çizgi: EMA20", fontSize = 10.sp, color = Muted)
 
             Spacer(Modifier.height(12.dp))

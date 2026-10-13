@@ -20,7 +20,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Card
+import com.kriptoradar.ui.components.Card
+import androidx.compose.foundation.layout.Box
+import com.kriptoradar.ui.components.enterAnim
+import com.kriptoradar.ui.components.AnimatedBar
+import com.kriptoradar.ui.components.bouncyClick
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -39,6 +43,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -98,11 +104,11 @@ private fun TodayTab(vm: MainViewModel, onOpen: (String) -> Unit, goLessons: () 
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (read.size < LearnContent.lessons.size) item {
-            Card(Modifier.fillMaxWidth().clickable(onClick = goLessons), colors = CardDefaults.cardColors(containerColor = Accent.copy(alpha = 0.15f))) {
+            Card(Modifier.fillMaxWidth().bouncyClick(goLessons), colors = CardDefaults.cardColors(containerColor = Accent.copy(alpha = 0.15f))) {
                 Column(Modifier.padding(14.dp)) {
                     Text("👋 Kriptoya yeni mi başlıyorsun?", fontWeight = FontWeight.Bold)
                     Text("${LearnContent.lessons.size} kısa dersle sıfırdan öğren. İlerleme: ${read.size}/${LearnContent.lessons.size}", fontSize = 13.sp)
-                    LinearProgressIndicator(progress = { read.size.toFloat() / LearnContent.lessons.size }, Modifier.fillMaxWidth().padding(top = 6.dp))
+                    AnimatedBar(read.size.toFloat() / LearnContent.lessons.size, Accent, Modifier.padding(top = 6.dp))
                     Text("Derslere git →", color = Accent, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
                 }
             }
@@ -123,7 +129,9 @@ private fun TodayTab(vm: MainViewModel, onOpen: (String) -> Unit, goLessons: () 
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(brief.moodEmoji, fontSize = 32.sp)
+                        val bob = androidx.compose.animation.core.rememberInfiniteTransition(label = "mood")
+                        val dy by bob.animateFloat(-4f, 4f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1600), androidx.compose.animation.core.RepeatMode.Reverse), label = "dy")
+                        Text(brief.moodEmoji, fontSize = 34.sp, modifier = Modifier.graphicsLayer { translationY = dy })
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text("Bugün piyasa: ${brief.moodTitle}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -152,21 +160,21 @@ private fun TodayTab(vm: MainViewModel, onOpen: (String) -> Unit, goLessons: () 
 
         if (brief.safer.isNotEmpty()) {
             item { SectionTitle("🟢 Yeni başlayan için daha sakin seçenekler", "Büyük ve köklü coinler arasından teknik görünümü olumlu olanlar.") }
-            items(brief.safer, key = { "s" + it.signal.symbol }) { PickCard(it, it.signal.symbol in favs, onOpen, vm::toggleFav, vm::openSimulator) }
+            items(brief.safer, key = { "s" + it.signal.symbol }) { Box(Modifier.animateItem().enterAnim(1)) { PickCard(it, it.signal.symbol in favs, onOpen, vm::toggleFav, vm::openSimulator) } }
         }
 
         item { SectionTitle("📈 İstatistiğe göre yükseliş eğiliminde olanlar", "Teknik puanı en yüksek coinler. Risk etiketine mutlaka bak.") }
         if (brief.rising.isEmpty()) item { Text("Şu an belirgin yükseliş eğiliminde coin yok. Piyasa zayıfken beklemek de bir stratejidir.", color = Muted, fontSize = 13.sp) }
-        items(brief.rising, key = { "r" + it.signal.symbol }) { PickCard(it, it.signal.symbol in favs, onOpen, vm::toggleFav, vm::openSimulator) }
+        items(brief.rising, key = { "r" + it.signal.symbol }) { Box(Modifier.animateItem().enterAnim(2)) { PickCard(it, it.signal.symbol in favs, onOpen, vm::toggleFav, vm::openSimulator) } }
 
         if (brief.reversals.isNotEmpty()) {
             item { SectionTitle("🔄 Çok düşmüş ama toparlanıyor olabilir", "Ucuzlamış ve grafiği yukarı dönmeye başlamış coinler. Düşüş yeniden başlayabilir.") }
-            items(brief.reversals, key = { "v" + it.signal.symbol }) { PickCard(it, it.signal.symbol in favs, onOpen, vm::toggleFav, vm::openSimulator) }
+            items(brief.reversals, key = { "v" + it.signal.symbol }) { Box(Modifier.animateItem().enterAnim(3)) { PickCard(it, it.signal.symbol in favs, onOpen, vm::toggleFav, vm::openSimulator) } }
         }
 
         if (brief.avoid.isNotEmpty()) {
             item { SectionTitle("⚠️ Şu an dikkatli olunması gerekenler", "Düşüş trendindeki coinler.") }
-            items(brief.avoid, key = { "a" + it.signal.symbol }) { PickCard(it, it.signal.symbol in favs, onOpen, vm::toggleFav, vm::openSimulator) }
+            items(brief.avoid, key = { "a" + it.signal.symbol }) { Box(Modifier.animateItem().enterAnim(4)) { PickCard(it, it.signal.symbol in favs, onOpen, vm::toggleFav, vm::openSimulator) } }
         }
 
         item {
@@ -196,7 +204,7 @@ private fun riskColor(r: Risk) = when (r) {
 private fun PickCard(p: Pick, fav: Boolean, onOpen: (String) -> Unit, onFav: (String) -> Unit, onSim: ((String) -> Unit)? = null) {
     var expanded by remember { mutableStateOf(false) }
     val s = p.signal
-    Card(Modifier.fillMaxWidth().animateContentSize().clickable { expanded = !expanded }) {
+    Card(Modifier.fillMaxWidth().animateContentSize().bouncyClick { expanded = !expanded }) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -243,7 +251,7 @@ private fun LessonsTab() {
         items(LearnContent.lessons, key = { it.id }) { l ->
             val isOpen = open == l.id
             val idx = LearnContent.lessons.indexOf(l) + 1
-            Card(Modifier.fillMaxWidth().animateContentSize().clickable {
+            Card(Modifier.fillMaxWidth().animateContentSize().bouncyClick {
                 open = if (isOpen) null else l.id
                 Prefs.markLessonRead(l.id)
             }) {

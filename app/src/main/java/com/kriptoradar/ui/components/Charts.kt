@@ -1,6 +1,17 @@
 package com.kriptoradar.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,11 +35,16 @@ import com.kriptoradar.ui.theme.Up
 
 /** Mum grafiği + EMA20 çizgisi + hacim çubukları. */
 @Composable
-fun CandleChart(klines: List<Kline>, ema: DoubleArray?, modifier: Modifier = Modifier) {
+fun CandleChart(klines: List<Kline>, ema: DoubleArray?, modifier: Modifier = Modifier, animKey: Any? = null) {
     if (klines.isEmpty()) {
-        Box(modifier.fillMaxWidth().height(260.dp), contentAlignment = Alignment.Center) { Text("Grafik yükleniyor…", color = Muted) }
+        Shimmer(modifier, height = 260.dp)
         return
     }
+    // Aralık değişince mumlar soldan sağa açılarak gelir
+    val reveal = remember(animKey) { Animatable(0f) }
+    LaunchedEffect(animKey) { reveal.animateTo(1f, tween(900, easing = FastOutSlowInEasing)) }
+    val pulse = rememberInfiniteTransition(label = "lastPulse")
+    val pr by pulse.animateFloat(0f, 1f, infiniteRepeatable(tween(1500)), label = "pr")
     val hi = klines.maxOf { it.high }; val lo = klines.minOf { it.low }
     val maxVol = klines.maxOf { it.volume }.takeIf { it > 0 } ?: 1.0
     Box(modifier.fillMaxWidth().height(260.dp)) {
@@ -43,7 +59,9 @@ fun CandleChart(klines: List<Kline>, ema: DoubleArray?, modifier: Modifier = Mod
                 val gy = priceH * g / 3f
                 drawLine(Color(0x22FFFFFF), Offset(0f, gy), Offset(size.width, gy), 1f)
             }
+            val visible = (n * reveal.value).toInt().coerceIn(1, n)
             klines.forEachIndexed { i, k ->
+                if (i >= visible) return@forEachIndexed
                 val cx = step * i + step / 2
                 val col = if (k.close >= k.open) Up else Down
                 drawLine(col, Offset(cx, y(k.high)), Offset(cx, y(k.low)), 1.2f)
@@ -54,12 +72,23 @@ fun CandleChart(klines: List<Kline>, ema: DoubleArray?, modifier: Modifier = Mod
             }
             if (ema != null && ema.size == n) {
                 val p = Path(); var started = false
-                for (i in 0 until n) {
+                for (i in 0 until visible) {
                     if (ema[i].isNaN()) continue
                     val pt = Offset(step * i + step / 2, y(ema[i]))
                     if (!started) { p.moveTo(pt.x, pt.y); started = true } else p.lineTo(pt.x, pt.y)
                 }
                 drawPath(p, Color(0xFFF0B90B), style = Stroke(1.5f))
+            }
+            if (reveal.value >= 1f) {
+                // Son fiyat: kesikli çizgi + nabız atan nokta
+                val last = klines.last()
+                val ly = y(last.close)
+                val col = if (last.close >= last.open) Up else Down
+                drawLine(col.copy(alpha = 0.5f), Offset(0f, ly), Offset(size.width, ly), 1f,
+                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(8f, 8f)))
+                val lx = step * (n - 1) + step / 2
+                drawCircle(col.copy(alpha = 0.35f * (1 - pr)), 4f + 14f * pr, Offset(lx, ly))
+                drawCircle(col, 4f, Offset(lx, ly))
             }
         }
         Text(Format.price(hi), Modifier.align(Alignment.TopEnd), fontSize = 10.sp, color = Muted)
@@ -68,12 +97,14 @@ fun CandleChart(klines: List<Kline>, ema: DoubleArray?, modifier: Modifier = Mod
     }
 }
 
-/** Küçük çizgi grafik (liste satırları için). */
+/** Küçük çizgi grafik; ilk görünüşte kendini soldan sağa çizer. */
 @Composable
-fun Sparkline(points: List<Double>, modifier: Modifier = Modifier) {
+fun Sparkline(points: List<Double>, modifier: Modifier = Modifier, animate: Boolean = true) {
     if (points.size < 2) { Box(modifier); return }
     val up = points.last() >= points.first()
     val col = if (up) Up else Down
+    val draw = remember { Animatable(if (animate) 0f else 1f) }
+    LaunchedEffect(Unit) { draw.animateTo(1f, tween(1100, easing = FastOutSlowInEasing)) }
     Canvas(modifier) {
         val mx = points.max(); val mn = points.min()
         val r = (mx - mn).takeIf { it > 0 } ?: 1.0
@@ -83,8 +114,17 @@ fun Sparkline(points: List<Double>, modifier: Modifier = Modifier) {
             val x = i * stepX; val y = ((mx - v) / r * size.height).toFloat()
             if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
-        val fill = Path().apply { addPath(path); lineTo(size.width, size.height); lineTo(0f, size.height); close() }
-        drawPath(fill, Brush.verticalGradient(listOf(col.copy(alpha = 0.25f), Color.Transparent)))
-        drawPath(path, col, style = Stroke(2f))
+        val pm = PathMeasure().apply { setPath(path, false) }
+        val seg = Path()
+        pm.getSegment(0f, pm.length * draw.value, seg, true)
+        clipRect(right = size.width * draw.value) {
+            val fill = Path().apply { addPath(path); lineTo(size.width, size.height); lineTo(0f, size.height); close() }
+            drawPath(fill, Brush.verticalGradient(listOf(col.copy(alpha = 0.28f), Color.Transparent)))
+        }
+        drawPath(seg, col, style = Stroke(2.2f))
+        if (draw.value >= 1f) {
+            val ly = ((mx - points.last()) / r * size.height).toFloat()
+            drawCircle(col, 3.5f, Offset(size.width, ly))
+        }
     }
 }

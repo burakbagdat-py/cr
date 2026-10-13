@@ -28,6 +28,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.graphicsLayer
+import com.kriptoradar.ui.components.ShimmerList
+import com.kriptoradar.ui.components.bouncyClick
+import com.kriptoradar.ui.theme.Up
+import com.kriptoradar.ui.theme.Down
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -72,15 +88,15 @@ fun MarketScreen(vm: MainViewModel, onOpen: (String) -> Unit) {
             Text("24s", fontSize = 11.sp, color = Muted)
         }
         if (rows.isEmpty()) {
-            Text(
-                if (f == MarketFilter.FAV) "Henüz favori yok. Listede ☆ simgesine dokunun." else "Veriler yükleniyor…",
-                Modifier.padding(24.dp), color = Muted,
-            )
+            if (f == MarketFilter.FAV) Text("Henüz favori yok. Listede ☆ simgesine dokunun.", Modifier.padding(24.dp), color = Muted)
+            else Column(Modifier.padding(12.dp)) { ShimmerList(8, 52.dp) }
         }
         LazyColumn(Modifier.fillMaxSize()) {
             items(rows, key = { it.t.symbol }) { r ->
-                Row_(r, onOpen = { onOpen(r.t.symbol) }, onFav = { vm.toggleFav(r.t.symbol) })
-                HorizontalDivider(color = Color(0x14FFFFFF))
+                Column(Modifier.animateItem()) {
+                    Row_(r, onOpen = { onOpen(r.t.symbol) }, onFav = { vm.toggleFav(r.t.symbol) })
+                    HorizontalDivider(color = Color(0x14FFFFFF))
+                }
             }
         }
     }
@@ -89,12 +105,27 @@ fun MarketScreen(vm: MainViewModel, onOpen: (String) -> Unit) {
 @Composable
 private fun Row_(r: MarketRow, onOpen: () -> Unit, onFav: () -> Unit) {
     val t = r.t
+    // Fiyat değişince satır kısa süre yeşil/kırmızı parlar
+    val prev = remember { mutableDoubleStateOf(t.price) }
+    val flash = remember { Animatable(0f) }
+    var flashUp by remember { mutableStateOf(true) }
+    LaunchedEffect(t.price) {
+        if (t.price != prev.doubleValue) {
+            flashUp = t.price > prev.doubleValue
+            prev.doubleValue = t.price
+            flash.snapTo(1f)
+            flash.animateTo(0f, tween(900))
+        }
+    }
+    val flashColor = (if (flashUp) Up else Down).copy(alpha = 0.16f * flash.value)
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(start = 4.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+        Modifier.fillMaxWidth().background(flashColor).bouncyClick(onOpen).padding(start = 4.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val starScale by animateFloatAsState(if (r.fav) 1.25f else 1f, spring(Spring.DampingRatioHighBouncy, Spring.StiffnessMedium), label = "star")
         IconButton(onClick = onFav, modifier = Modifier.size(36.dp)) {
-            Icon(if (r.fav) Icons.Filled.Star else Icons.Outlined.Star, null, tint = if (r.fav) Accent else Muted, modifier = Modifier.size(18.dp))
+            Icon(if (r.fav) Icons.Filled.Star else Icons.Outlined.Star, null, tint = if (r.fav) Accent else Muted,
+                modifier = Modifier.size(18.dp).graphicsLayer { scaleX = starScale; scaleY = starScale })
         }
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.Bottom) {

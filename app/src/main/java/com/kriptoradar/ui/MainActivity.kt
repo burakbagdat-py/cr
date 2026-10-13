@@ -5,6 +5,23 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import com.kriptoradar.ui.components.PulsingDot
+import com.kriptoradar.ui.theme.Aero
+import com.kriptoradar.ui.theme.AeroBackground
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -115,13 +132,25 @@ private fun App(vm: MainViewModel, detail: String?, setDetail: (String?) -> Unit
     BackHandler(enabled = detail != null) { setDetail(null) }
     BackHandler(enabled = detail == null && settings) { overlay = if (overlay == "admin") "settings" else null }
 
-    if (detail != null) {
-        CoinDetailScreen(vm, detail, onBack = { setDetail(null) })
-        return
+    Box(Modifier.fillMaxSize()) {
+    AeroBackground()
+    AnimatedContent(
+        targetState = detail,
+        transitionSpec = {
+            if (targetState != null) (slideInHorizontally(tween(380)) { it / 3 } + fadeIn(tween(300))) togetherWith fadeOut(tween(200))
+            else fadeIn(tween(300)) togetherWith (slideOutHorizontally(tween(320)) { it / 3 } + fadeOut(tween(250)))
+        },
+        label = "detail",
+    ) { d ->
+    if (d != null) {
+        CoinDetailScreen(vm, d, onBack = { setDetail(null) })
+        return@AnimatedContent
     }
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 title = { Text(when (overlay) { "settings" -> "Ayarlar"; "admin" -> "Admin Paneli"; else -> "Kripto Radar" }, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     if (settings) IconButton(onClick = { overlay = if (overlay == "admin") "settings" else null }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri") }
@@ -133,18 +162,20 @@ private fun App(vm: MainViewModel, detail: String?, setDetail: (String?) -> Unit
             )
         },
         bottomBar = {
-            NavigationBar {
+            NavigationBar(containerColor = Aero.bar, tonalElevation = 0.dp) {
                 Tab.entries.forEach { t ->
                     NavigationBarItem(
                         selected = tab == t && !settings, onClick = { tab = t; overlay = null },
                         icon = {
-                            Icon(when (t) {
+                            val sel = tab == t && !settings
+                            val sc by animateFloatAsState(if (sel) 1.18f else 1f, spring(Spring.DampingRatioMediumBouncy), label = "nav")
+                            Icon(modifier = Modifier.graphicsLayer { scaleX = sc; scaleY = sc }, imageVector = when (t) {
                                 Tab.LEARN -> Icons.Default.Info
                                 Tab.MARKET -> Icons.Default.Home
                                 Tab.SIGNALS -> Icons.Default.Star
                                 Tab.SIM -> Icons.Default.PlayArrow
                                 Tab.ALERTS -> Icons.Default.Notifications
-                            }, null)
+                            }, contentDescription = null)
                         },
                         label = { Text(t.label, fontSize = 11.sp, maxLines = 1) },
                     )
@@ -155,17 +186,33 @@ private fun App(vm: MainViewModel, detail: String?, setDetail: (String?) -> Unit
         val upd by vm.update.collectAsStateWithLifecycle()
         Column(Modifier.padding(pad).fillMaxSize()) {
             if (!settings) UpdateBanner(upd, vm::downloadUpdate, vm::installUpdate)
-            Box(Modifier.weight(1f).fillMaxSize()) {
-                if (overlay == "admin") AdminScreen(vm)
-                else if (overlay == "settings") SettingsScreen(vm, openAdmin = { overlay = "admin" }) else when (tab) {
-                    Tab.LEARN -> LearnScreen(vm, onOpen = setDetail)
-                    Tab.MARKET -> MarketScreen(vm, onOpen = setDetail)
-                    Tab.SIGNALS -> SignalsScreen(vm, onOpen = setDetail)
-                    Tab.SIM -> SimulatorScreen(vm, onOpen = setDetail)
-                    Tab.ALERTS -> AlertsScreen(vm)
+            // Sekme/katman değişimi: yöne göre kayarak geçiş
+            AnimatedContent(
+                targetState = overlay ?: tab.name,
+                modifier = Modifier.weight(1f).fillMaxSize(),
+                transitionSpec = {
+                    val order = listOf("LEARN", "MARKET", "SIGNALS", "SIM", "ALERTS", "settings", "admin")
+                    val dir = if (order.indexOf(targetState) >= order.indexOf(initialState)) 1 else -1
+                    (slideInHorizontally(tween(340)) { it / 4 * dir } + fadeIn(tween(280)) + scaleIn(tween(340), initialScale = 0.98f)) togetherWith
+                        (slideOutHorizontally(tween(300)) { -it / 4 * dir } + fadeOut(tween(200)))
+                },
+                label = "tabs",
+            ) { key ->
+                Box(Modifier.fillMaxSize()) {
+                    when (key) {
+                        "admin" -> AdminScreen(vm)
+                        "settings" -> SettingsScreen(vm, openAdmin = { overlay = "admin" })
+                        "LEARN" -> LearnScreen(vm, onOpen = setDetail)
+                        "MARKET" -> MarketScreen(vm, onOpen = setDetail)
+                        "SIGNALS" -> SignalsScreen(vm, onOpen = setDetail)
+                        "SIM" -> SimulatorScreen(vm, onOpen = setDetail)
+                        else -> AlertsScreen(vm)
+                    }
                 }
             }
         }
+    }
+    }
     }
 }
 
@@ -182,8 +229,8 @@ private fun ConnBadge(vm: MainViewModel) {
         ConnState.DISCONNECTED -> Down to "Çevrimdışı"
     }
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 12.dp)) {
-        Box(Modifier.size(8.dp).clip(CircleShape).background(col))
-        Spacer(Modifier.width(6.dp))
+        if (st == ConnState.LIVE) PulsingDot(col, 7.dp) else Box(Modifier.size(8.dp).clip(CircleShape).background(col))
+        Spacer(Modifier.width(4.dp))
         Text(text, fontSize = 12.sp, color = Muted, style = MaterialTheme.typography.labelSmall)
     }
 }

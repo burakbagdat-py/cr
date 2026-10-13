@@ -20,6 +20,15 @@ data class Dca(val buys: Int, val invested: Double, val qty: Double, val valueNo
     val pct get() = if (invested > 0) pnl / invested * 100 else 0.0
 }
 
+/** Monte Carlo sonucu: çizilecek örnek yollar + gün gün yüzdelik bantlar. */
+class MonteCarlo(
+    val horizon: Int,
+    val paths: List<DoubleArray>,
+    val p10: DoubleArray, val p50: DoubleArray, val p90: DoubleArray,
+    val lossProbability: Double,
+    val sims: Int,
+)
+
 data class Forecast(
     val horizonDays: Int, val samples: Int, val lossProbability: Double,
     val p5: Double, val p10: Double, val p50: Double, val p90: Double, val p95: Double,
@@ -83,5 +92,36 @@ object Simulator {
             horizon, rets.size, rets.count { it * fees < 1.0 }.toDouble() / rets.size,
             pct(0.05), pct(0.10), pct(0.50), pct(0.90), pct(0.95),
         )
+    }
+
+    /**
+     * Monte Carlo: geçmişteki günlük getirilerden rastgele seçerek (bootstrap) [sims] olası gelecek üretir.
+     * [drawPaths] tanesi grafikte çizilmek üzere saklanır.
+     */
+    fun monteCarlo(
+        s: List<DayPrice>, horizon: Int, amount: Double, feePct: Double, seed: Long,
+        sims: Int = 2000, drawPaths: Int = 60, lookback: Int = 730,
+    ): MonteCarlo? {
+        val from = max(1, s.size - lookback)
+        val rets = DoubleArray(s.size - from) { s[from + it].price / s[from + it - 1].price }
+        if (rets.size < 60 || horizon < 1) return null
+        val rnd = kotlin.random.Random(seed)
+        val start = amount * (1 - feePct / 100)
+        val all = Array(sims) { DoubleArray(horizon + 1) }
+        for (k in 0 until sims) {
+            val path = all[k]
+            path[0] = start
+            for (d in 1..horizon) path[d] = path[d - 1] * rets[rnd.nextInt(rets.size)]
+            path[horizon] *= (1 - feePct / 100)
+        }
+        val p10 = DoubleArray(horizon + 1); val p50 = DoubleArray(horizon + 1); val p90 = DoubleArray(horizon + 1)
+        val col = DoubleArray(sims)
+        for (d in 0..horizon) {
+            for (k in 0 until sims) col[k] = all[k][d]
+            col.sort()
+            p10[d] = col[(0.10 * (sims - 1)).toInt()]; p50[d] = col[(0.50 * (sims - 1)).toInt()]; p90[d] = col[(0.90 * (sims - 1)).toInt()]
+        }
+        val loss = all.count { it[horizon] < amount }.toDouble() / sims
+        return MonteCarlo(horizon, all.take(drawPaths), p10, p50, p90, loss, sims)
     }
 }

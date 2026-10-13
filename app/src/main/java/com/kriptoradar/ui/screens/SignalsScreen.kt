@@ -20,7 +20,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Card
+import com.kriptoradar.ui.components.Card
+import androidx.compose.foundation.layout.Box
+import com.kriptoradar.ui.components.enterAnim
+import com.kriptoradar.ui.components.AnimatedBar
+import com.kriptoradar.ui.components.bouncyClick
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -106,7 +110,7 @@ fun SignalsScreen(vm: MainViewModel, onOpen: (String) -> Unit) {
                         Text(if (scanning) "İlk tarama yapılıyor… (coinlerin 500 saatlik verisi analiz ediliyor)" else "Henüz tarama yok. Yenile'ye dokunun.", color = Muted)
                     }
                     if (scan != null && list.isEmpty()) item { Text("Bu filtreye uyan coin yok.", color = Muted) }
-                    items(list, key = { it.symbol }) { SignalCard(it, onOpen) }
+                    items(list, key = { it.symbol }) { Box(Modifier.animateItem().enterAnim()) { SignalCard(it, onOpen) } }
                 }
             }
         }
@@ -157,10 +161,10 @@ private fun ReversalTab(scan: ScanResult?, scanning: Boolean, onScan: () -> Unit
         if (scan != null && candidates.isEmpty()) item {
             Text("Şu an tüm koşulları sağlayan coin yok. Yeni aday çıktığında bildirim gelir.", color = Muted, fontSize = 13.sp)
         }
-        items(candidates, key = { "c" + it.symbol }) { ReversalCard(it, onOpen) }
+        items(candidates, key = { "c" + it.symbol }) { Box(Modifier.animateItem().enterAnim()) { ReversalCard(it, onOpen) } }
         if (watch.isNotEmpty()) {
             item { Text("👀 İzleme listesi – çok düşük, dönüş henüz teyit edilmedi", fontWeight = FontWeight.Bold, color = Accent, modifier = Modifier.padding(top = 8.dp)) }
-            items(watch, key = { "w" + it.symbol }) { ReversalCard(it, onOpen) }
+            items(watch, key = { "w" + it.symbol }) { Box(Modifier.animateItem().enterAnim()) { ReversalCard(it, onOpen) } }
         }
     }
 }
@@ -169,7 +173,7 @@ private fun ReversalTab(scan: ScanResult?, scanning: Boolean, onScan: () -> Unit
 private fun ReversalCard(s: Signal, onOpen: (String) -> Unit) {
     val r = s.reversal ?: return
     var expanded by remember { mutableStateOf(r.candidate) }
-    Card(Modifier.fillMaxWidth().animateContentSize().clickable { expanded = !expanded }) {
+    Card(Modifier.fillMaxWidth().animateContentSize().bouncyClick { expanded = !expanded }) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ScoreBadge(r.score, if (r.candidate) Up else Accent)
@@ -203,7 +207,7 @@ private fun ReversalCard(s: Signal, onOpen: (String) -> Unit) {
 private fun Meter(label: String, v: Double, color: Color) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
         Text(label, fontSize = 11.sp, color = Muted, modifier = Modifier.width(100.dp))
-        LinearProgressIndicator(progress = { v.toFloat().coerceIn(0f, 1f) }, Modifier.weight(1f).height(6.dp), color = color, trackColor = Color(0x22FFFFFF))
+        AnimatedBar(v.toFloat(), color, Modifier.weight(1f))
         Text(" ${(v * 100).toInt()}", fontSize = 11.sp, modifier = Modifier.width(32.dp))
     }
 }
@@ -237,7 +241,7 @@ private fun SuggestionTracker(vm: MainViewModel, onOpen: (String) -> Unit) {
         }
         if (rows.isEmpty()) item { Text("Henüz kayıt yok. Yeni dip dönüş adayı veya güçlü sinyal bildirildiğinde burada görünür.", color = Muted) }
         items(rows, key = { it.first.symbol + it.first.at }) { (r, ret) ->
-            Card(Modifier.fillMaxWidth().clickable { onOpen(r.symbol) }) {
+            Card(Modifier.fillMaxWidth().bouncyClick { onOpen(r.symbol) }) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(r.base, fontWeight = FontWeight.Bold)
@@ -277,7 +281,7 @@ private fun MarketHeader(scan: ScanResult?, scanning: Boolean, onScan: () -> Uni
                 val avg = s.map { it.score }.average()
                 val bull = s.count { it.score >= 60 }
                 Text("Ortalama teknik skor: ${avg.toInt()} • Olumlu görünüm: $bull/${s.size}", fontSize = 12.sp, color = Muted)
-                LinearProgressIndicator(progress = { (avg / 100).toFloat() }, Modifier.fillMaxWidth().padding(top = 4.dp), color = scoreColor(avg.toInt()))
+                AnimatedBar((avg / 100).toFloat(), scoreColor(avg.toInt()), Modifier.padding(top = 4.dp))
             }
         }
     }
@@ -295,7 +299,7 @@ private fun Stat(title: String, value: String, sub: String, color: Color, modifi
 @Composable
 private fun SignalCard(s: Signal, onOpen: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    Card(Modifier.fillMaxWidth().animateContentSize().clickable { expanded = !expanded }) {
+    Card(Modifier.fillMaxWidth().animateContentSize().bouncyClick { expanded = !expanded }) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ScoreBadge(s.score, scoreColor(s.score))

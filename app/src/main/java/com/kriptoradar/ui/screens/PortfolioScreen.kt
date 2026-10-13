@@ -19,7 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import com.kriptoradar.ui.components.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -47,6 +47,11 @@ import com.kriptoradar.data.PaperEngine
 import com.kriptoradar.ui.Format
 import com.kriptoradar.ui.MainViewModel
 import com.kriptoradar.ui.components.PctPill
+import com.kriptoradar.ui.components.AnimatedNumber
+import com.kriptoradar.ui.components.ConfettiBurst
+import com.kriptoradar.ui.components.bouncyClick
+import com.kriptoradar.ui.components.enterAnim
+import androidx.compose.foundation.layout.Box
 import com.kriptoradar.ui.components.Sparkline
 import com.kriptoradar.ui.theme.Accent
 import com.kriptoradar.ui.theme.Down
@@ -82,7 +87,7 @@ fun PortfolioTab(vm: MainViewModel, onOpen: (String) -> Unit) {
                     Text("Gerçek para yok; gerçek fiyatlarla al-sat, emir ver, kendini test et.", fontSize = 12.sp, color = Muted)
                     Spacer(Modifier.height(8.dp))
                     Text("Toplam değer", fontSize = 11.sp, color = Muted)
-                    Text(tl(equity), fontSize = 28.sp, fontWeight = FontWeight.Bold, color = changeColor(pnl))
+                    AnimatedNumber(equity, { tl(it) }, fontSize = 30.sp, fontWeight = FontWeight.Bold, color = changeColor(pnl))
                     Text("${if (pnl >= 0) "Kâr" else "Zarar"}: ${signedTl(pnl)} (${Format.signedPct(if (p.totalDeposited > 0) pnl / p.totalDeposited * 100 else 0.0)})",
                         color = changeColor(pnl), fontWeight = FontWeight.SemiBold)
                     val points = p.equity.map { it.value } + equity
@@ -111,16 +116,16 @@ fun PortfolioTab(vm: MainViewModel, onOpen: (String) -> Unit) {
             val price = prices[h.symbol]
             val value = price?.let { h.qty * it } ?: h.costTry
             val hp = value - h.costTry
-            Card(Modifier.fillMaxWidth()) {
+            Card(Modifier.fillMaxWidth().animateItem().enterAnim()) {
                 Column(Modifier.padding(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f).clickable { onOpen(h.symbol) }) {
+                        Column(Modifier.weight(1f).bouncyClick { onOpen(h.symbol) }) {
                             Text(h.base, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                             Text("${Format.price(h.qty)} adet • ort. maliyet ${Format.price(h.avgCostTry)} TL", fontSize = 11.sp, color = Muted)
                             Text("Şu an ${price?.let { Format.price(it) + " TL" } ?: "—"}", fontSize = 11.sp, color = Muted)
                         }
                         Column(horizontalAlignment = Alignment.End) {
-                            Text(tl(value), fontWeight = FontWeight.SemiBold)
+                            AnimatedNumber(value, { tl(it) }, fontWeight = FontWeight.SemiBold)
                             Text(signedTl(hp), fontSize = 12.sp, color = changeColor(hp))
                             PctPill(if (h.costTry > 0) hp / h.costTry * 100 else 0.0)
                         }
@@ -137,7 +142,7 @@ fun PortfolioTab(vm: MainViewModel, onOpen: (String) -> Unit) {
             item { Text("⏳ Bekleyen emirler (${p.orders.size})", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp)) }
             items(p.orders, key = { "o" + it.id }) { o ->
                 val cur = prices[o.symbol]
-                Card(Modifier.fillMaxWidth()) {
+                Card(Modifier.fillMaxWidth().animateItem()) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("${orderLabel(o.kind)} • ${o.base}", fontWeight = FontWeight.SemiBold)
@@ -165,12 +170,34 @@ fun PortfolioTab(vm: MainViewModel, onOpen: (String) -> Unit) {
 
         if (p.ledger.isNotEmpty()) {
             item { Text("🧾 Hesap hareketleri", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp)) }
-            items(if (showAllLedger) p.ledger else p.ledger.take(15), key = { "l" + it.id }) { LedgerRow(it) }
+            items(if (showAllLedger) p.ledger else p.ledger.take(15), key = { "l" + it.id }) { Box(Modifier.animateItem()) { LedgerRow(it) } }
             if (!showAllLedger && p.ledger.size > 15) item { TextButton(onClick = { showAllLedger = true }) { Text("Tümünü göster (${p.ledger.size})") } }
         }
     }
 
     trade?.let { (sym, isBuy) -> TradeDialog(vm, sym, isBuy) { trade = null } }
+
+    // Kârlı satış kutlaması
+    val party by vm.celebrate.collectAsStateWithLifecycle()
+    ConfettiBurst(party?.first)
+    party?.let { (at, profit) ->
+        val show = remember(at) { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+        androidx.compose.runtime.LaunchedEffect(at) { kotlinx.coroutines.delay(2200); show.targetState = false }
+        androidx.compose.animation.AnimatedVisibility(show,
+            enter = androidx.compose.animation.scaleIn(androidx.compose.animation.core.spring(0.45f)) + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut()) {
+            androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Card(tint = Up.copy(alpha = 0.25f)) {
+                    Column(Modifier.padding(horizontal = 28.dp, vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("🎉", fontSize = 40.sp)
+                        Text("Kârla sattın!", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text(signedTl(profit), color = Up, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+                        Text("(sanal)", fontSize = 11.sp, color = Muted)
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -222,6 +249,7 @@ private enum class Mode(val label: String, val buy: Boolean) {
 @Composable
 fun TradeDialog(vm: MainViewModel, initialSymbol: String?, buy: Boolean, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     val tickers by vm.tickers.collectAsStateWithLifecycle()
     val p by vm.paper.collectAsStateWithLifecycle()
     var symbol by remember { mutableStateOf(initialSymbol) }
@@ -326,6 +354,7 @@ fun TradeDialog(vm: MainViewModel, initialSymbol: String?, buy: Boolean, onDismi
                 }
                 if (err != null) error = err
                 else {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                     Toast.makeText(ctx, if (mode == Mode.MARKET_BUY || mode == Mode.MARKET_SELL) "İşlem tamam (sanal)" else "Emir kaydedildi", Toast.LENGTH_SHORT).show()
                     onDismiss()
                 }

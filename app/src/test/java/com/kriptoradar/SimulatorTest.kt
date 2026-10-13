@@ -76,3 +76,40 @@ class SimulatorTest {
         }
     }
 }
+
+class MonteCarloTest {
+    private val day = 86_400_000L
+
+    @Test fun flatSeriesWithFeesAlwaysLoses() {
+        val s = List(400) { DayPrice(it * day, 100.0) }
+        val mc = Simulator.monteCarlo(s, 30, 1000.0, 0.2, seed = 1)!!
+        assertEquals(1.0, mc.lossProbability, 1e-9)
+        assertEquals(60, mc.paths.size)
+        assertEquals(31, mc.p50.size)
+    }
+
+    @Test fun steadyGrowthNeverLoses() {
+        val s = List(400) { DayPrice(it * day, 100.0 * Math.pow(1.002, it.toDouble())) }
+        val mc = Simulator.monteCarlo(s, 30, 1000.0, 0.0, seed = 7)!!
+        assertEquals(0.0, mc.lossProbability, 1e-9)
+        assertTrue(mc.p10.last() <= mc.p50.last() && mc.p50.last() <= mc.p90.last())
+    }
+
+    @Test fun sameSeedSameResult() {
+        val s = List(400) { DayPrice(it * day, 100.0 + 10 * Math.sin(it / 5.0)) }
+        val a = Simulator.monteCarlo(s, 7, 1000.0, 0.1, seed = 42)!!
+        val b = Simulator.monteCarlo(s, 7, 1000.0, 0.1, seed = 42)!!
+        assertEquals(a.lossProbability, b.lossProbability, 0.0)
+    }
+
+    @Test fun liveBitcoinMonteCarlo() = kotlinx.coroutines.runBlocking {
+        val coin = runCatching { BinanceApi.klines("BTCUSDT", "1d", 1000) }.getOrNull()
+        org.junit.Assume.assumeTrue(coin != null)
+        val s = Simulator.series(coin!!, null)
+        val t0 = System.nanoTime()
+        val mc = Simulator.monteCarlo(s, 90, 1000.0, 0.2, seed = 1)!!
+        val ms = (System.nanoTime() - t0) / 1e6
+        println("BTC 3 ay MC: zarar %${(mc.lossProbability * 100).toInt()}, p10=${"%.0f".format(mc.p10.last())} p50=${"%.0f".format(mc.p50.last())} p90=${"%.0f".format(mc.p90.last())} ($ms ms)")
+        assertTrue("çok yavaş: $ms ms", ms < 1500)
+    }
+}

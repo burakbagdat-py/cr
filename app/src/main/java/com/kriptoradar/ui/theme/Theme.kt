@@ -27,8 +27,10 @@ fun KriptoTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(
             primary = Accent, onPrimary = Color.Black,
-            secondary = Up, background = Bg, surface = Bg,
-            surfaceVariant = Card, surfaceContainer = Card, surfaceContainerHigh = Card,
+            secondary = Up, background = Color.Transparent, surface = Color.Transparent,
+            surfaceVariant = Color(0x1FFFFFFF), surfaceContainer = Aero.bar, surfaceContainerHigh = Color(0xF2141A26),
+            surfaceContainerHighest = Color(0x1FFFFFFF), secondaryContainer = Color(0x33F0B90B),
+            outline = Color(0x40FFFFFF), outlineVariant = Color(0x22FFFFFF),
             onSurface = Color(0xFFEAECEF), onSurfaceVariant = Muted,
         ),
         content = content,

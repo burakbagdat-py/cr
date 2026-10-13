@@ -115,9 +115,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         return paperOp { PaperEngine.buy(it, symbol, t.base, price, amountTry) }
     }
 
+    /** Kârlı satışta kutlama (zaman, kâr). */
+    val celebrate = MutableStateFlow<Pair<Long, Double>?>(null)
+
     fun paperSell(symbol: String, fraction: Double): String? {
         val price = priceTry(symbol) ?: return "Fiyat bulunamadı"
-        return paperOp { PaperEngine.sell(it, symbol, fraction, price) }
+        val err = paperOp { PaperEngine.sell(it, symbol, fraction, price) }
+        if (err == null) paper.value.ledger.firstOrNull()?.takeIf { it.pnlTry > 0 }?.let { celebrate.value = System.currentTimeMillis() to it.pnlTry }
+        return err
     }
 
     fun paperOrder(symbol: String, kind: OrderKind, triggerTry: Double, amountTry: Double, fraction: Double): String? {

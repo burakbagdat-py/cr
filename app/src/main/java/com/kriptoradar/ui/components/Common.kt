@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -16,17 +17,16 @@ import com.kriptoradar.ui.theme.changeColor
 
 @Composable
 fun PctPill(v: Double, modifier: Modifier = Modifier) {
-    Box(modifier.background(changeColor(v), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+    val bg by androidx.compose.animation.animateColorAsState(changeColor(v), androidx.compose.animation.core.tween(400), label = "pill")
+    Box(modifier.background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(bg, bg.copy(alpha = 0.75f))), RoundedCornerShape(8.dp))
+        .padding(horizontal = 8.dp, vertical = 4.dp)) {
         Text(Format.signedPct(v), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
+/** Skor rozeti: dolan halka. */
 @Composable
-fun ScoreBadge(score: Int, color: Color, modifier: Modifier = Modifier) {
-    Box(modifier.background(color.copy(alpha = 0.18f), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp)) {
-        Text("$score", color = color, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-    }
-}
+fun ScoreBadge(score: Int, color: Color, modifier: Modifier = Modifier) = ScoreRing(score, color, modifier, 46.dp)
 
 const val DISCLAIMER = "Bu uygulamadaki skorlar ve öneriler yalnızca geçmiş fiyat/hacim istatistiklerinden " +
     "otomatik hesaplanır; yatırım tavsiyesi değildir. Kripto paralar çok yüksek risk taşır."
