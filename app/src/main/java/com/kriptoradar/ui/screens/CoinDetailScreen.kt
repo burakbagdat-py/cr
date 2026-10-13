@@ -132,6 +132,11 @@ fun CoinDetailScreen(vm: MainViewModel, symbol: String, onBack: () -> Unit) {
                 Text("Veri bekleniyor…", color = Muted)
             }
 
+            if (t != null && t.quote == "USDT") {
+                androidx.compose.material3.OutlinedButton(onClick = { vm.openSimulator(symbol) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    Text("💰 Bu coine para koysam ne olur? (Simülatör)")
+                }
+            }
             Row(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 intervals.forEach { (k, l) -> FilterChip(selected = interval == k, onClick = { interval = k }, label = { Text(l) }) }
             }

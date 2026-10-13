@@ -22,6 +22,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
@@ -50,9 +55,11 @@ import com.kriptoradar.data.ConnState
 import com.kriptoradar.ui.components.UpdateBanner
 import com.kriptoradar.ui.screens.AlertsScreen
 import com.kriptoradar.ui.screens.CoinDetailScreen
+import com.kriptoradar.ui.screens.LearnScreen
 import com.kriptoradar.ui.screens.MarketScreen
 import com.kriptoradar.ui.screens.SettingsScreen
 import com.kriptoradar.ui.screens.SignalsScreen
+import com.kriptoradar.ui.screens.SimulatorScreen
 import com.kriptoradar.ui.theme.Accent
 import com.kriptoradar.ui.theme.Down
 import com.kriptoradar.ui.theme.KriptoTheme
@@ -90,13 +97,20 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Tab(val label: String) { MARKET("Piyasa"), SIGNALS("Sinyaller"), ALERTS("Alarmlar"), SETTINGS("Ayarlar") }
+private enum class Tab(val label: String) { LEARN("Rehber"), MARKET("Piyasa"), SIGNALS("Sinyaller"), SIM("Simülatör"), ALERTS("Alarmlar") }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun App(vm: MainViewModel, detail: String?, setDetail: (String?) -> Unit) {
-    var tab by rememberSaveable { mutableStateOf(Tab.MARKET) }
+    var tab by rememberSaveable { mutableStateOf(Tab.LEARN) }
+    var settings by rememberSaveable { mutableStateOf(false) }
+    val nav by vm.navRequest.collectAsStateWithLifecycle()
+    LaunchedEffect(nav) {
+        if (nav == "sim") { tab = Tab.SIM; settings = false; setDetail(null) }
+        if (nav != null) vm.navRequest.value = null
+    }
     BackHandler(enabled = detail != null) { setDetail(null) }
+    BackHandler(enabled = detail == null && settings) { settings = false }
 
     if (detail != null) {
         CoinDetailScreen(vm, detail, onBack = { setDetail(null) })
@@ -105,24 +119,31 @@ private fun App(vm: MainViewModel, detail: String?, setDetail: (String?) -> Unit
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Kripto Radar", fontWeight = FontWeight.Bold) },
-                actions = { ConnBadge(vm) },
+                title = { Text(if (settings) "Ayarlar" else "Kripto Radar", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    if (settings) IconButton(onClick = { settings = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri") }
+                },
+                actions = {
+                    ConnBadge(vm)
+                    if (!settings) IconButton(onClick = { settings = true }) { Icon(Icons.Default.Settings, "Ayarlar") }
+                },
             )
         },
         bottomBar = {
             NavigationBar {
                 Tab.entries.forEach { t ->
                     NavigationBarItem(
-                        selected = tab == t, onClick = { tab = t },
+                        selected = tab == t && !settings, onClick = { tab = t; settings = false },
                         icon = {
                             Icon(when (t) {
+                                Tab.LEARN -> Icons.Default.Info
                                 Tab.MARKET -> Icons.Default.Home
                                 Tab.SIGNALS -> Icons.Default.Star
+                                Tab.SIM -> Icons.Default.PlayArrow
                                 Tab.ALERTS -> Icons.Default.Notifications
-                                Tab.SETTINGS -> Icons.Default.Settings
                             }, null)
                         },
-                        label = { Text(t.label) },
+                        label = { Text(t.label, fontSize = 11.sp, maxLines = 1) },
                     )
                 }
             }
@@ -130,13 +151,14 @@ private fun App(vm: MainViewModel, detail: String?, setDetail: (String?) -> Unit
     ) { pad ->
         val upd by vm.update.collectAsStateWithLifecycle()
         Column(Modifier.padding(pad).fillMaxSize()) {
-            if (tab != Tab.SETTINGS) UpdateBanner(upd, vm::downloadUpdate, vm::installUpdate)
+            if (!settings) UpdateBanner(upd, vm::downloadUpdate, vm::installUpdate)
             Box(Modifier.weight(1f).fillMaxSize()) {
-                when (tab) {
+                if (settings) SettingsScreen(vm) else when (tab) {
+                    Tab.LEARN -> LearnScreen(vm, onOpen = setDetail)
                     Tab.MARKET -> MarketScreen(vm, onOpen = setDetail)
                     Tab.SIGNALS -> SignalsScreen(vm, onOpen = setDetail)
+                    Tab.SIM -> SimulatorScreen(vm, onOpen = setDetail)
                     Tab.ALERTS -> AlertsScreen(vm)
-                    Tab.SETTINGS -> SettingsScreen(vm)
                 }
             }
         }

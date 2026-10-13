@@ -78,6 +78,53 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     val update = UpdateManager.state
+    val paper = Prefs.paper
+
+    /** Simülatörde seçili coin (USDT çifti) ve sekme geçiş isteği. */
+    val simSymbol = MutableStateFlow("BTCUSDT")
+    val navRequest = MutableStateFlow<String?>(null)
+
+    fun openSimulator(symbol: String) {
+        simSymbol.value = symbol
+        navRequest.value = "sim"
+    }
+
+    fun usdTry(): Double? = tickers.value["USDTTRY"]?.price
+
+    /** Sanal portföyde TL ile al. Başarısızsa hata mesajı döner. */
+    fun paperBuy(symbol: String, amountTry: Double): String? {
+        val t = tickers.value[symbol] ?: return "Fiyat bulunamadı"
+        val rate = usdTry() ?: return "Dolar/TL kuru alınamadı"
+        val p = paper.value
+        if (amountTry <= 0) return "Tutar girin"
+        if (amountTry > p.cash + 1e-6) return "Sanal bakiyen yetersiz (${Format.num(p.cash)} TL)"
+        val qty = com.kriptoradar.analysis.Simulator.qtyFor(amountTry, t.price * rate, p.feePct)
+        Prefs.updatePaper {
+            it.copy(cash = it.cash - amountTry, positions = it.positions + com.kriptoradar.data.PaperPosition(
+                System.currentTimeMillis(), symbol, t.base, qty, t.price, rate, amountTry, System.currentTimeMillis()))
+        }
+        return null
+    }
+
+    fun paperValue(pos: com.kriptoradar.data.PaperPosition): Double? {
+        val t = tickers.value[pos.symbol] ?: return null
+        val rate = usdTry() ?: return null
+        return pos.qty * t.price * rate * (1 - paper.value.feePct / 100)
+    }
+
+    fun paperSell(id: Long) {
+        val pos = paper.value.positions.firstOrNull { it.id == id } ?: return
+        val v = paperValue(pos) ?: return
+        Prefs.updatePaper {
+            it.copy(
+                cash = it.cash + v,
+                positions = it.positions.filterNot { p -> p.id == id },
+                closed = (listOf(com.kriptoradar.data.PaperClosed(pos.base, pos.investedTry, v, pos.at, System.currentTimeMillis())) + it.closed).take(100),
+            )
+        }
+    }
+
+    fun paperReset(startCash: Double) = Prefs.updatePaper { com.kriptoradar.data.PaperPortfolio(startCash = startCash, cash = startCash, feePct = it.feePct) }
 
     fun checkUpdate() { viewModelScope.launch { UpdateManager.check() } }
     fun downloadUpdate(info: UpdateInfo) { viewModelScope.launch { UpdateManager.download(getApplication(), info) } }

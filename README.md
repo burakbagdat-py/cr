@@ -25,6 +25,16 @@ Kripto piyasasını **saniyelik** takip eden, bildirim gönderen ve **yalnızca 
 - Teknik skoru eşiği **yeni geçen** coinler için sinyal bildirimi.
 - Aynı olay için tekrar tekrar bildirim gelmesini önleyen bekleme süresi.
 
+**📚 Rehber (yeni başlayanlar için)**
+- *Bugün*: Analizlerin sade Türkçe özeti – piyasanın ruh hali, Bitcoin'in durumu, "istatistiğe göre yükseliş eğilimindeki" coinler (neden? sorusunun sade cevabı, coinin ne olduğu ve risk etiketi 🟢🟡🟠🔴), dipten dönenler ve uzak durulması gerekenler.
+- *Dersler*: 12 kısa ders – kripto nedir, Bitcoin, altcoin/stablecoin/memecoin, adım adım nasıl alınır, güvenlik, fiyat neden değişir, grafik okuma, göstergeler, uygulamadaki skorlar, risk yönetimi, dolandırıcılıklar, yol haritası.
+- *Sözlük*: 55+ terimlik aranabilir sözlük.
+
+**💰 Simülatör**
+- *Ne olurdu?*: "X TL ile kaç BTC alırım" (komisyon dahil), %10/%50 senaryoları; 1 hafta–2 yıl önce koysaydın bugünkü değeri ve arada düştüğü en kötü değer;
+  tek seferde vs. haftalık parça parça (DCA) karşılaştırması; geçmiş 2 yıllık dağılıma göre 1 gün/1 hafta/1 ay/3 ay sonra zarar ihtimali ve kötü/orta/iyi senaryolar. TL hesapları günlük dolar/TL kuruyla yapılır.
+- *Sanal Portföy*: 10.000 sanal TL ile gerçek fiyatlardan al-sat, canlı kâr/zarar ve işlem geçmişi.
+
 **🔄 Dip Dönüş Dedektörü** (`ReversalDetector`)
 Çok düşmüş **ama** grafiği yukarı dönmeye başlamış coinleri otomatik bulur ve bildirir.
 

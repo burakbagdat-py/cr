@@ -25,6 +25,12 @@ object Prefs {
     private val _suggestions = MutableStateFlow<List<SuggestionRecord>>(emptyList())
     val suggestions: StateFlow<List<SuggestionRecord>> = _suggestions
 
+    private val _readLessons = MutableStateFlow<Set<String>>(emptySet())
+    val readLessons: StateFlow<Set<String>> = _readLessons
+
+    private val _paper = MutableStateFlow(PaperPortfolio())
+    val paper: StateFlow<PaperPortfolio> = _paper
+
     private val _scan = MutableStateFlow<ScanResult?>(null)
     val scan: StateFlow<ScanResult?> = _scan
 
@@ -35,6 +41,8 @@ object Prefs {
         _alerts.value = read("alerts", ListSerializer(PriceAlert.serializer())) ?: emptyList()
         _favorites.value = read("favorites", SetSerializer(String.serializer())) ?: _favorites.value
         _scan.value = read("scan", ScanResult.serializer())
+        _paper.value = read("paper", PaperPortfolio.serializer()) ?: PaperPortfolio()
+        _readLessons.value = read("read_lessons", SetSerializer(String.serializer())) ?: emptySet()
         _suggestions.value = read("suggestions", ListSerializer(SuggestionRecord.serializer())) ?: emptyList()
     }
 
@@ -68,6 +76,16 @@ object Prefs {
         if (items.isEmpty()) return
         val v = (items + _suggestions.value).take(200)
         _suggestions.value = v; write("suggestions", ListSerializer(SuggestionRecord.serializer()), v)
+    }
+
+    @Synchronized
+    fun updatePaper(f: (PaperPortfolio) -> PaperPortfolio) {
+        val v = f(_paper.value); _paper.value = v; write("paper", PaperPortfolio.serializer(), v)
+    }
+
+    fun markLessonRead(id: String) {
+        if (id in _readLessons.value) return
+        val v = _readLessons.value + id; _readLessons.value = v; write("read_lessons", SetSerializer(String.serializer()), v)
     }
 
     fun clearSuggestions() {
