@@ -61,8 +61,11 @@ Ayrıca: Korku & Açgözlülük endeksi, BTC dominansı, toplam piyasa değeri d
 
 ## Kurulum
 
-### Hazır APK
-Her push'ta GitHub Actions APK üretir: **Actions → APK Derle → son çalıştırma → Artifacts → KriptoRadar-apk**. Zip'i açıp `app-release.apk` dosyasını telefona yükleyin (bilinmeyen kaynaklara izin verin).
+### Hazır APK (telefondan doğrudan indirme)
+**👉 https://github.com/burakbagdat-py/cr/releases/download/apk/KriptoRadar.apk**
+
+Linki telefonun tarayıcısında açın → indirilen `KriptoRadar.apk` dosyasına dokunun → "Bilinmeyen uygulamaları yükle" iznini verin → Yükle.
+Link her güncellemede otomatik olarak en son sürümü gösterir (GitHub Actions derler).
 
 ### Kendiniz derleyin
 ```bash
