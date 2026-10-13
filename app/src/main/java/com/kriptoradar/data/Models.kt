@@ -59,8 +59,10 @@ data class Settings(
     val minQuoteVolume: Double = 10_000_000.0,
     val signalNotify: Boolean = true,
     val signalThreshold: Int = 75,
-    val scanIntervalMin: Int = 15,
-    val scanUniverse: Int = 60,
+    val scanIntervalMin: Int = 10,
+    val scanUniverse: Int = 100,
+    val reversalNotify: Boolean = true,
+    val reversalThreshold: Int = 65,
     val volumeSpikeNotify: Boolean = true,
     val volumeSpikeRatio: Double = 4.0,
     val alertCooldownMin: Int = 30,
@@ -85,6 +87,44 @@ data class Signal(
     val histAvgReturn: Double,
     val histSamples: Int,
     val volatilityPct: Double,
+    /** Dip dönüş analizi (bkz. ReversalDetector). */
+    val reversal: Reversal? = null,
+    /** Önceki taramaya göre skor değişimi. */
+    val scoreDelta: Int? = null,
+)
+
+@Serializable
+data class Reversal(
+    /** 0-100: "ne kadar düşük" ve "ne kadar dönüyor" birleşimi. */
+    val score: Int,
+    /** Hem aşırı düşüş hem dönüş koşulları sağlandı mı. */
+    val candidate: Boolean,
+    val depth: Double,
+    val turn: Double,
+    val drawdown30: Double,
+    val bounceFromLow: Double,
+    val reasons: List<String>,
+    /** Bu coinin kendi geçmişinde aynı desen sonrası 24s getiri istatistiği. */
+    val histWins: Int = 0,
+    val histSamples: Int = 0,
+    val histSumReturn: Double = 0.0,
+) {
+    val histWinRate: Double get() = if (histSamples >= 3) histWins.toDouble() / histSamples else -1.0
+    val histAvgReturn: Double get() = if (histSamples > 0) histSumReturn / histSamples else 0.0
+}
+
+@Serializable
+enum class SuggestionKind { REVERSAL, STRONG }
+
+/** Uygulamanın öne çıkardığı coinlerin sonradan nasıl performans gösterdiğini takip etmek için. */
+@Serializable
+data class SuggestionRecord(
+    val symbol: String,
+    val base: String,
+    val kind: SuggestionKind,
+    val price: Double,
+    val score: Int,
+    val at: Long,
 )
 
 @Serializable
@@ -95,4 +135,11 @@ data class ScanResult(
     val fearGreedLabel: String? = null,
     val btcDominance: Double? = null,
     val totalMcapChange24h: Double? = null,
-)
+    /** Dip dönüş deseninin TÜM taranan coinlerdeki geçmiş başarısı (24s sonrası). */
+    val revBaseWins: Int = 0,
+    val revBaseSamples: Int = 0,
+    val revBaseSumReturn: Double = 0.0,
+) {
+    val revBaseWinRate: Double get() = if (revBaseSamples >= 5) revBaseWins.toDouble() / revBaseSamples else -1.0
+    val revBaseAvgReturn: Double get() = if (revBaseSamples > 0) revBaseSumReturn / revBaseSamples else 0.0
+}

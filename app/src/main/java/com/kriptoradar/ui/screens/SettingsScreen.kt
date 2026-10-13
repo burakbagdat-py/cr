@@ -80,13 +80,18 @@ fun SettingsScreen(vm: MainViewModel) {
             SliderRow("Aynı coin için bekleme", s.alertCooldownMin.toFloat(), 5f..240f, { "${it.toInt()} dk" }) { v -> Prefs.updateSettings { it.copy(alertCooldownMin = v.toInt()) } }
         }
 
+        Section("Dip dönüş dedektörü") {
+            ToggleRow("Dip dönüş bildirimleri", "Çok düşmüş ama yükselişe dönme eğilimi gösteren coinleri otomatik bildir", s.reversalNotify) { v -> Prefs.updateSettings { it.copy(reversalNotify = v) } }
+            SliderRow("En düşük dip dönüş skoru", s.reversalThreshold.toFloat(), 40f..90f, { "${it.toInt()}" }) { v -> Prefs.updateSettings { it.copy(reversalThreshold = v.toInt()) } }
+        }
+
         Section("İstatistiksel tarama") {
             ToggleRow("Sinyal bildirimleri", "Skoru eşiği yeni geçen coinler", s.signalNotify) { v -> Prefs.updateSettings { it.copy(signalNotify = v) } }
             SliderRow("Skor eşiği", s.signalThreshold.toFloat(), 50f..95f, { "${it.toInt()}" }) { v -> Prefs.updateSettings { it.copy(signalThreshold = v.toInt()) } }
             ToggleRow("Hacim patlaması bildirimi", null, s.volumeSpikeNotify) { v -> Prefs.updateSettings { it.copy(volumeSpikeNotify = v) } }
             SliderRow("Hacim patlaması oranı", s.volumeSpikeRatio.toFloat(), 2f..10f, { Format.num(it.toDouble()) + "x" }) { v -> Prefs.updateSettings { it.copy(volumeSpikeRatio = v.toDouble()) } }
             SliderRow("Tarama aralığı", s.scanIntervalMin.toFloat(), 5f..60f, { "${it.toInt()} dk" }) { v -> Prefs.updateSettings { it.copy(scanIntervalMin = v.toInt()) } }
-            SliderRow("Taranan coin sayısı", s.scanUniverse.toFloat(), 20f..150f, { "${it.toInt()}" }) { v -> Prefs.updateSettings { it.copy(scanUniverse = v.toInt()) } }
+            SliderRow("Taranan coin sayısı", s.scanUniverse.toFloat(), 20f..200f, { "${it.toInt()}" }) { v -> Prefs.updateSettings { it.copy(scanUniverse = v.toInt()) } }
         }
 
         Section("Hakkında") {

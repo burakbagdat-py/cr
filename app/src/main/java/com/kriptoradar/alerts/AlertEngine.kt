@@ -5,6 +5,8 @@ import com.kriptoradar.data.AlertType
 import com.kriptoradar.data.MarketRepository
 import com.kriptoradar.data.Prefs
 import com.kriptoradar.data.ScanResult
+import com.kriptoradar.data.SuggestionKind
+import com.kriptoradar.data.SuggestionRecord
 import com.kriptoradar.data.Ticker
 import com.kriptoradar.ui.Format
 import kotlin.math.abs
@@ -80,12 +82,42 @@ class AlertEngine(private val ctx: Context) {
     fun onScan(prev: ScanResult?, now: ScanResult) {
         val s = Prefs.settings.value
         val ts = System.currentTimeMillis()
+        val records = mutableListOf<SuggestionRecord>()
+
+        // Dip dönüş adayları: çok düşmüş ama yukarı dönmeye başlamış coinler
+        val prevRev = prev?.signals?.filter { it.reversal?.candidate == true }?.map { it.symbol }?.toSet() ?: emptySet()
+        val newRev = now.signals
+            .filter { val r = it.reversal; r != null && r.candidate && r.score >= s.reversalThreshold && it.symbol !in prevRev }
+            .filter { ts - Prefs.lastNotified("rev_${it.symbol}") > 12 * 3_600_000L }
+            .sortedByDescending { it.reversal!!.score }
+        newRev.forEach {
+            Prefs.markNotified("rev_${it.symbol}", ts)
+            records += SuggestionRecord(it.symbol, it.base, SuggestionKind.REVERSAL, it.price, it.reversal!!.score, ts)
+        }
+        if (s.reversalNotify) {
+            newRev.forEach { sig ->
+                val r = sig.reversal!!
+                val hist = if (r.histWinRate >= 0) "\nBu coinde benzer desen ${r.histSamples} kez: 24s sonra %${(r.histWinRate * 100).toInt()} yükseldi (ort. ${Format.signedPct(r.histAvgReturn)})" else ""
+                Notifier.post(
+                    ctx, Notifier.CH_REVERSAL, "rev_${sig.symbol}".hashCode(),
+                    "🔄 ${sig.base}: dip dönüş adayı (${r.score}/100)",
+                    "${sig.base} ${Format.price(sig.price)} • 30g zirveden -%${Format.num(r.drawdown30)} • dipten +%${Format.num(r.bounceFromLow)}\n" +
+                        r.reasons.take(4).joinToString("\n") { "• $it" } + hist +
+                        "\n(İstatistiksel tespit, yatırım tavsiyesi değildir)",
+                    sig.symbol,
+                )
+            }
+        }
+
         if (s.signalNotify) {
             val prevStrong = prev?.signals?.filter { it.score >= s.signalThreshold }?.map { it.symbol }?.toSet() ?: emptySet()
             val fresh = now.signals.filter { it.score >= s.signalThreshold && it.symbol !in prevStrong }
                 .filter { ts - Prefs.lastNotified("sig_${it.symbol}") > 6 * 3_600_000L }
             if (fresh.isNotEmpty()) {
-                fresh.forEach { Prefs.markNotified("sig_${it.symbol}", ts) }
+                fresh.forEach {
+                    Prefs.markNotified("sig_${it.symbol}", ts)
+                    records += SuggestionRecord(it.symbol, it.base, SuggestionKind.STRONG, it.price, it.score, ts)
+                }
                 val text = fresh.take(6).joinToString("\n") {
                     "${it.base}: skor ${it.score} • RSI ${it.rsi.toInt()} • 24s %${Format.num(it.change24h)}"
                 } + "\n(İstatistiksel gösterge, yatırım tavsiyesi değildir)"
@@ -105,5 +137,6 @@ class AlertEngine(private val ctx: Context) {
                     sig.symbol)
             }
         }
+        Prefs.addSuggestions(records)
     }
 }

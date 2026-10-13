@@ -12,7 +12,7 @@ import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.kriptoradar.alerts.AlertEngine
 import com.kriptoradar.alerts.Notifier
-import com.kriptoradar.analysis.SignalEngine
+import com.kriptoradar.alerts.ScanRunner
 import com.kriptoradar.data.ConnState
 import com.kriptoradar.data.MarketRepository
 import com.kriptoradar.data.Prefs
@@ -21,8 +21,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 /**
  * Uygulama kapalıyken bile tüm piyasayı saniyelik izleyen ön plan servisi.
@@ -101,16 +99,8 @@ class MarketService : LifecycleService() {
         }
     }
 
-    private suspend fun runScan() = scanMutex.withLock {
-        val tk = MarketRepository.tickers.value
-        if (tk.isEmpty() && !MarketRepository.refreshSnapshot()) return@withLock
-        val s = Prefs.settings.value
-        val prev = Prefs.scan.value
-        val res = runCatching { SignalEngine.scan(MarketRepository.tickers.value, s.scanUniverse) }.getOrNull()
-            ?: return@withLock
-        if (res.signals.isEmpty()) return@withLock
-        Prefs.saveScan(res)
-        engine.onScan(prev, res)
+    private suspend fun runScan() {
+        ScanRunner.run(this)
     }
 
     override fun onDestroy() {
@@ -124,7 +114,6 @@ class MarketService : LifecycleService() {
         const val ACTION_SCAN_NOW = "scan_now"
         @Volatile var running = false
             private set
-        val scanMutex = Mutex()
 
         fun start(ctx: Context, scanNow: Boolean = false): Boolean = try {
             val i = Intent(ctx, MarketService::class.java)

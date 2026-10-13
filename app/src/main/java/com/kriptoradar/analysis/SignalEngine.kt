@@ -35,11 +35,14 @@ object SignalEngine {
                          val boll: Double = 0.05, val vol: Double = 0.05)
     private val w = W()
 
-    suspend fun scan(tickers: Map<String, Ticker>, universe: Int, quote: String = "USDT"): ScanResult = coroutineScope {
-        val candidates = tickers.values
-            .filter { it.quote == quote && BinanceApi.isTradable(it.base) && it.quoteVolume > 0 }
-            .sortedByDescending { it.quoteVolume }
-            .take(universe)
+    suspend fun scan(
+        tickers: Map<String, Ticker>, universe: Int, quote: String = "USDT", prev: ScanResult? = null,
+    ): ScanResult = coroutineScope {
+        val pool = tickers.values.filter { it.quote == quote && BinanceApi.isTradable(it.base) && it.quoteVolume > 0 }
+        val byVolume = pool.sortedByDescending { it.quoteVolume }.take(universe)
+        // Dipler çoğu zaman en hacimliler arasında olmaz: likit olup en çok düşenleri de ekle
+        val losers = pool.filter { it.quoteVolume > 3_000_000 }.sortedBy { it.change24hPct }.take(25)
+        val candidates = (byVolume + losers).distinctBy { it.symbol }
         val btc = tickers["BTC$quote"] ?: tickers["BTCUSDT"]
         val btcChange = btc?.change24hPct ?: 0.0
 
@@ -51,15 +54,23 @@ object SignalEngine {
                 sem.withPermit {
                     runCatching {
                         val h1 = BinanceApi.klines(t.symbol, "1h", 500)
-                        val d1 = BinanceApi.klines(t.symbol, "1d", 60)
+                        val d1 = BinanceApi.klines(t.symbol, "1d", 120)
                         analyze(t, h1, d1, btcChange)
                     }.getOrNull()
                 }
             }
         }.awaitAll().filterNotNull().sortedByDescending { it.score }
 
+        val prevScores = prev?.signals?.associate { it.symbol to it.score } ?: emptyMap()
+        val withDelta = signals.map { s -> prevScores[s.symbol]?.let { s.copy(scoreDelta = s.score - it) } ?: s }
+        val revs = signals.mapNotNull { it.reversal }
         val f = fg.await(); val g = gl.await()
-        ScanResult(System.currentTimeMillis(), signals, f?.first, f?.second, g?.first, g?.second)
+        ScanResult(
+            System.currentTimeMillis(), withDelta, f?.first, f?.second, g?.first, g?.second,
+            revBaseWins = revs.sumOf { it.histWins },
+            revBaseSamples = revs.sumOf { it.histSamples },
+            revBaseSumReturn = revs.sumOf { it.histSumReturn },
+        )
     }
 
     fun analyze(t: Ticker, h1: List<Kline>, d1: List<Kline>, btcChange24h: Double): Signal? {
@@ -182,7 +193,10 @@ object SignalEngine {
             sum += ret; n++; if (ret > 0) wins++
         }
 
+        val reversal = ReversalDetector.detect(h1, d1, last)
+
         val label = when {
+            reversal?.candidate == true -> "Dip dönüş adayı"
             score >= 75 -> "Güçlü teknik görünüm"
             score >= 60 -> "Olumlu"
             rsi < 30 && score >= 40 -> "Aşırı satım – tepki adayı"
@@ -196,6 +210,7 @@ object SignalEngine {
             change24h = t.change24hPct, rsi = rsi, volumeRatio = volRatio, factors = factors,
             histWinRate = if (n >= 5) wins.toDouble() / n else -1.0,
             histAvgReturn = if (n > 0) sum / n else 0.0, histSamples = n, volatilityPct = atr,
+            reversal = reversal,
         )
     }
 

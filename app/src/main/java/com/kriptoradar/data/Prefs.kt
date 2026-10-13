@@ -22,6 +22,9 @@ object Prefs {
     private val _favorites = MutableStateFlow<Set<String>>(setOf("BTCUSDT", "ETHUSDT"))
     val favorites: StateFlow<Set<String>> = _favorites
 
+    private val _suggestions = MutableStateFlow<List<SuggestionRecord>>(emptyList())
+    val suggestions: StateFlow<List<SuggestionRecord>> = _suggestions
+
     private val _scan = MutableStateFlow<ScanResult?>(null)
     val scan: StateFlow<ScanResult?> = _scan
 
@@ -32,6 +35,7 @@ object Prefs {
         _alerts.value = read("alerts", ListSerializer(PriceAlert.serializer())) ?: emptyList()
         _favorites.value = read("favorites", SetSerializer(String.serializer())) ?: _favorites.value
         _scan.value = read("scan", ScanResult.serializer())
+        _suggestions.value = read("suggestions", ListSerializer(SuggestionRecord.serializer())) ?: emptyList()
     }
 
     private fun <T> read(key: String, s: kotlinx.serialization.KSerializer<T>): T? =
@@ -57,6 +61,17 @@ object Prefs {
 
     fun saveScan(r: ScanResult) {
         _scan.value = r; write("scan", ScanResult.serializer(), r)
+    }
+
+    @Synchronized
+    fun addSuggestions(items: List<SuggestionRecord>) {
+        if (items.isEmpty()) return
+        val v = (items + _suggestions.value).take(200)
+        _suggestions.value = v; write("suggestions", ListSerializer(SuggestionRecord.serializer()), v)
+    }
+
+    fun clearSuggestions() {
+        _suggestions.value = emptyList(); write("suggestions", ListSerializer(SuggestionRecord.serializer()), emptyList())
     }
 
     /** Bildirim bekleme süresi takibi (aynı olay için tekrar tekrar bildirim gitmesin). */

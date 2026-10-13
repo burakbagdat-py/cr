@@ -51,6 +51,7 @@ import com.kriptoradar.ui.components.DISCLAIMER
 import com.kriptoradar.ui.components.ScoreBadge
 import com.kriptoradar.ui.theme.Accent
 import com.kriptoradar.ui.theme.Muted
+import com.kriptoradar.ui.theme.Up
 import com.kriptoradar.ui.theme.changeColor
 import com.kriptoradar.ui.theme.scoreColor
 import kotlinx.coroutines.delay
@@ -82,7 +83,7 @@ fun CoinDetailScreen(vm: MainViewModel, symbol: String, onBack: () -> Unit) {
         val tk = MarketRepository.tickers.value[symbol] ?: return@LaunchedEffect
         val res = runCatching {
             val h1 = BinanceApi.klines(symbol, "1h", 500)
-            val d1 = BinanceApi.klines(symbol, "1d", 60)
+            val d1 = BinanceApi.klines(symbol, "1d", 120)
             val btc = MarketRepository.tickers.value["BTCUSDT"]?.change24hPct ?: 0.0
             SignalEngine.analyze(tk, h1, d1, btc)
         }
@@ -160,6 +161,34 @@ fun CoinDetailScreen(vm: MainViewModel, symbol: String, onBack: () -> Unit) {
                         }
                         analysisError -> Text("Analiz için yeterli veri yok.", color = Muted)
                         else -> Text("Hesaplanıyor…", color = Muted)
+                    }
+                }
+            }
+            signal?.reversal?.let { r ->
+                Spacer(Modifier.height(12.dp))
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text("Dip Dönüş Analizi", fontWeight = FontWeight.Bold)
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
+                            ScoreBadge(r.score, if (r.candidate) Up else if (r.depth >= 0.45) Accent else Muted)
+                            Spacer(Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    when {
+                                        r.candidate -> "Dip dönüş adayı ✅"
+                                        r.depth >= 0.45 -> "Çok düşük, dönüş henüz teyit edilmedi"
+                                        else -> "Aşırı düşüş bölgesinde değil"
+                                    },
+                                    color = if (r.candidate) Up else if (r.depth >= 0.45) Accent else Muted, fontWeight = FontWeight.SemiBold,
+                                )
+                                Text("Derinlik ${(r.depth * 100).toInt()} • Dönüş ${(r.turn * 100).toInt()}", fontSize = 11.sp, color = Muted)
+                            }
+                        }
+                        r.reasons.forEach { Text("• $it", fontSize = 12.sp) }
+                        if (r.histWinRate >= 0) Text(
+                            "Bu coinde aynı desen ${r.histSamples} kez: 24s sonra %${(r.histWinRate * 100).toInt()} yükseliş, ort. ${Format.signedPct(r.histAvgReturn)}",
+                            fontSize = 11.sp, color = Muted, modifier = Modifier.padding(top = 4.dp),
+                        )
                     }
                 }
             }

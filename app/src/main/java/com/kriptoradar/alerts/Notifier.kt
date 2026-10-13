@@ -19,6 +19,7 @@ object Notifier {
     const val CH_ALERT = "alerts"
     const val CH_MOVE = "moves"
     const val CH_SIGNAL = "signals"
+    const val CH_REVERSAL = "reversal"
     const val LIVE_ID = 1
 
     fun createChannels(ctx: Context) {
@@ -32,6 +33,9 @@ object Notifier {
             },
             NotificationChannel(CH_MOVE, "Ani hareketler", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "Kısa sürede sert yükseliş/düşüş ve hacim patlamaları"
+            },
+            NotificationChannel(CH_REVERSAL, "Dip dönüş adayları", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Çok düşmüş ama yükselişe dönme eğilimi gösteren coinler (tavsiye değildir)"
             },
             NotificationChannel(CH_SIGNAL, "İstatistiksel sinyaller", NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = "Teknik skoru eşiği geçen coinler (tavsiye değildir)"

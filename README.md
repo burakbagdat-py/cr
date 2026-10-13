@@ -21,11 +21,26 @@ Kripto piyasasını **saniyelik** takip eden, bildirim gönderen ve **yalnızca 
 - Fiyat hedefi (yukarı/aşağı yön otomatik), 24s % değişim, "X dakikada ±%Y" ani hareket alarmları; tek sefer veya tekrarlı.
 - Otomatik **ani hareket** tespiti: favoriler + hacimli coinlerde ayarlanabilir eşik/pencere (varsayılan 5 dk'da %3).
 - **Hacim patlaması** (son 6 saat / önceki 48 saat ≥ 4x).
+- **Dip dönüş adayı** bildirimi (gerekçeleriyle birlikte).
 - Teknik skoru eşiği **yeni geçen** coinler için sinyal bildirimi.
 - Aynı olay için tekrar tekrar bildirim gelmesini önleyen bekleme süresi.
 
+**🔄 Dip Dönüş Dedektörü** (`ReversalDetector`)
+Çok düşmüş **ama** grafiği yukarı dönmeye başlamış coinleri otomatik bulur ve bildirir.
+
+*Derinlik – ne kadar düşük?* 30 günlük zirveden düşüş, 30 günlük aralıktaki konum, son 7 günün en düşük günlük RSI'ı.
+
+*Dönüş – yükselmeye meyilli mi?* Saatlik RSI'ın aşırı satımdan toparlanması, EMA9'un EMA21'i yukarı kesmesi, MACD'nin pozitife dönmesi,
+dipten tepki + daha yüksek dip (dip tekrar test edilmedi), pozitif RSI uyumsuzluğu, son 24 saatin regresyon eğimi (R² ile tutarlılık), alış yönlü hacim baskınlığı.
+
+Aday = derinlik ≥ 0.45, 30g zirveden ≥ %15 aşağıda, dönüş ≥ 0.5 ve son 6 saatte çöküş yok ("düşen bıçak" elenir).
+Her aday için bu desenin hem o coinin kendi geçmişindeki hem de tüm taranan coinlerdeki 24 saat sonraki isabet oranı gösterilir.
+Tarama en hacimli coinlerin yanında 24 saatin en çok düşen likit coinlerini de kapsar. Tam teyit edilmemiş "çok düşük" coinler izleme listesinde gösterilir.
+
+**📈 Öneri Takibi**: Bildirilen her öneri, bildirim anındaki fiyatıyla kaydedilir ve canlı getirisi izlenir; yöntemin gerçekte ne kadar tuttuğunu görürsünüz.
+
 **İstatistiksel öneri motoru** (`SignalEngine`)
-En hacimli N coin (varsayılan 60) için 500 saatlik + 60 günlük mum verisi çekilir ve 0-100 skor üretilir:
+En hacimli N coin (varsayılan 100) + en çok düşen 25 likit coin için 500 saatlik + 60 günlük mum verisi çekilir ve 0-100 skor üretilir:
 
 | Bileşen | Ağırlık | Ölçüt |
 |---|---|---|
@@ -42,7 +57,7 @@ Ek olarak **geçmiş isabet istatistiği**: son ~500 saatte aynı teknik koşul 
 
 Ayrıca: Korku & Açgözlülük endeksi, BTC dominansı, toplam piyasa değeri değişimi.
 
-**Ekranlar**: Piyasa (arama, favoriler, yükselen/düşen, hacim, 5 dk ani hareket), Sinyaller, Coin detayı (mum grafiği + EMA20, 1/5/15/60 dk değişim, faktör dökümü), Alarmlar, Ayarlar. USDT / TRY / FDUSD / BTC çiftleri.
+**Ekranlar**: Piyasa (arama, favoriler, yükselen/düşen, hacim, 5 dk ani hareket), Sinyaller (Dip Dönüş / Teknik Skor / Öneri Takibi), Coin detayı (mum grafiği + EMA20, 1/5/15/60 dk değişim, faktör dökümü), Alarmlar, Ayarlar. USDT / TRY / FDUSD / BTC çiftleri.
 
 ## Kurulum
 

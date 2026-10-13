@@ -3,7 +3,7 @@ package com.kriptoradar.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.kriptoradar.analysis.SignalEngine
+import com.kriptoradar.alerts.ScanRunner
 import com.kriptoradar.data.AlertType
 import com.kriptoradar.data.BinanceApi
 import com.kriptoradar.data.MarketRepository
@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.withLock
 
 enum class MarketFilter(val label: String) {
     FAV("Favoriler"), ALL("Tümü"), GAINERS("Yükselenler"), LOSERS("Düşenler"), VOLUME("Hacim"), MOVERS("Ani hareket")
@@ -35,6 +34,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val alerts = Prefs.alerts
     val favorites = Prefs.favorites
     val scan = Prefs.scan
+    val suggestions = Prefs.suggestions
 
     val query = MutableStateFlow("")
     val filter = MutableStateFlow(MarketFilter.VOLUME)
@@ -74,6 +74,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         super.onCleared()
     }
 
+    fun clearSuggestions() = Prefs.clearSuggestions()
+
     fun toggleFav(symbol: String) = Prefs.toggleFavorite(symbol)
 
     fun scanNow() {
@@ -81,11 +83,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.Default) {
             _scanning.value = true
             try {
-                MarketService.scanMutex.withLock {
-                    if (tickers.value.isEmpty()) MarketRepository.refreshSnapshot()
-                    val res = SignalEngine.scan(tickers.value, settings.value.scanUniverse)
-                    if (res.signals.isNotEmpty()) Prefs.saveScan(res)
-                }
+                ScanRunner.run(getApplication())
             } catch (_: Exception) {
             } finally {
                 _scanning.value = false
