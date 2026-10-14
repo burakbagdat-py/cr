@@ -89,7 +89,8 @@ class AlertEngine(private val ctx: Context) {
                 Voice.rapidMove(t.base, up, c, s.rapidMoveWindowMin, "${Format.price(t.price)} ${t.quote}", t.change24hPct)
             else "${if (up) "🚀" else "🔻"} ${t.base} ${s.rapidMoveWindowMin} dk'da %${Format.num(c)}" to
                 "${t.base}/${t.quote} ${Format.price(t.price)} • 24s %${Format.num(t.change24hPct)} • Hacim ${Format.compact(t.quoteVolume)} ${t.quote}"
-            Notifier.post(ctx, Notifier.CH_MOVE, key.hashCode(), title, text, t.symbol)
+            Notifier.post(ctx, Notifier.CH_MOVE, key.hashCode(), title, text, t.symbol,
+                buySymbol = if (up) QuickTrade.usdtSymbol(t.symbol) else null)
         }
     }
 
@@ -113,7 +114,7 @@ class AlertEngine(private val ctx: Context) {
                 val r = sig.reversal!!
                 if (s.casualMode) {
                     val (title, text) = Voice.reversal(sig.base, r.drawdown30, r.bounceFromLow, Format.price(sig.price))
-                    Notifier.post(ctx, Notifier.CH_REVERSAL, "rev_${sig.symbol}".hashCode(), title, text, sig.symbol)
+                    Notifier.post(ctx, Notifier.CH_REVERSAL, "rev_${sig.symbol}".hashCode(), title, text, sig.symbol, buySymbol = sig.symbol)
                     return@forEach
                 }
                 val hist = if (r.histWinRate >= 0) "\nBu coinde benzer desen ${r.histSamples} kez: 24s sonra %${(r.histWinRate * 100).toInt()} yükseldi (ort. ${Format.signedPct(r.histAvgReturn)})" else ""
@@ -124,6 +125,7 @@ class AlertEngine(private val ctx: Context) {
                         r.reasons.take(4).joinToString("\n") { "• $it" } + hist +
                         "\n(İstatistiksel tespit, yatırım tavsiyesi değildir)",
                     sig.symbol,
+                    buySymbol = sig.symbol,
                 )
             }
         }
@@ -143,7 +145,14 @@ class AlertEngine(private val ctx: Context) {
                     else "📊 ${shown.size} coin teknik eşiği geçti" to shown.take(6).joinToString("\n") {
                         "${it.base}: skor ${it.score} • RSI ${it.rsi.toInt()} • 24s %${Format.num(it.change24h)}"
                     } + "\n(İstatistiksel gösterge, yatırım tavsiyesi değildir)"
-                    Notifier.post(ctx, Notifier.CH_SIGNAL, 2001, title, text, shown.first().symbol)
+                    Notifier.post(ctx, Notifier.CH_SIGNAL, 2001, title, text, shown.first().symbol,
+                        buySymbol = if (shown.size == 1) shown.first().symbol else null, inbox = false)
+                    shown.forEach { sg ->
+                        Prefs.addInbox(com.kriptoradar.data.InboxItem(0, ts, com.kriptoradar.data.InboxKind.SIGNAL,
+                            "📊 ${sg.base} teknik eşiği geçti (puan ${sg.score})",
+                            "RSI ${sg.rsi.toInt()} • 24s ${Format.signedPct(sg.change24h)} • ${sg.label}. İstatistiksel gösterge, tavsiye değildir.",
+                            sg.symbol, sg.symbol, sg.price))
+                    }
                 }
             }
         }
@@ -156,7 +165,8 @@ class AlertEngine(private val ctx: Context) {
                 val (title, text) = if (s.casualMode) Voice.volumeSpike(sig.base, sig.volumeRatio, sig.change24h)
                 else "📈 ${sig.base} hacim patlaması (${Format.num(sig.volumeRatio)}x)" to
                     "Son 6 saatlik hacim, önceki 48 saatin ortalamasının ${Format.num(sig.volumeRatio)} katı. 24s %${Format.num(sig.change24h)}"
-                Notifier.post(ctx, Notifier.CH_MOVE, key.hashCode(), title, text, sig.symbol)
+                Notifier.post(ctx, Notifier.CH_MOVE, key.hashCode(), title, text, sig.symbol,
+                    buySymbol = if (sig.change24h > 0) sig.symbol else null)
             }
         }
         Prefs.addSuggestions(records)

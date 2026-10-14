@@ -22,6 +22,7 @@ class WatchdogWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result {
         Prefs.init(applicationContext)
         runCatching { UpdateManager.checkInBackground(applicationContext) }
+        runCatching { com.kriptoradar.alerts.DailySummary.maybeSend(applicationContext) }
         val s = Prefs.settings.value
         if (!s.serviceEnabled) return Result.success()
         if (MarketService.running) return Result.success()

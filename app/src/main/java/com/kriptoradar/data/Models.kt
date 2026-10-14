@@ -80,6 +80,14 @@ data class Settings(
     val paperLossStepPct: Double = 5.0,
     /** Elindeki coin 5 dakikada bu kadar oynarsa haber ver. */
     val paperMovePct: Double = 2.0,
+    /** Tek dokunuşla (bildirimden/kutudan) alırken harcanacak sanal TL. */
+    val quickBuyAmount: Double = 1000.0,
+    /** Alırken otomatik zarar-kes ve kâr-al emri kur. */
+    val autoProtect: Boolean = true,
+    val autoStopPct: Double = 5.0,
+    val autoTakePct: Double = 10.0,
+    /** Akşam 21:00'den sonra günün sanal portföy özetini bildir. */
+    val dailySummary: Boolean = true,
 ) {
     fun allows(base: String) = !onlySelectedCoins || base in notifyCoins
 }

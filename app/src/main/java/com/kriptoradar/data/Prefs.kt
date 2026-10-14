@@ -31,6 +31,9 @@ object Prefs {
     private val _paper = MutableStateFlow(PaperPortfolio())
     val paper: StateFlow<PaperPortfolio> = _paper
 
+    private val _inbox = MutableStateFlow<List<InboxItem>>(emptyList())
+    val inbox: StateFlow<List<InboxItem>> = _inbox
+
     private val _scan = MutableStateFlow<ScanResult?>(null)
     val scan: StateFlow<ScanResult?> = _scan
 
@@ -42,6 +45,7 @@ object Prefs {
         _favorites.value = read("favorites", SetSerializer(String.serializer())) ?: _favorites.value
         _scan.value = read("scan", ScanResult.serializer())
         _paper.value = PaperEngine.migrate(read("paper", PaperPortfolio.serializer()) ?: PaperPortfolio())
+        _inbox.value = read("inbox", ListSerializer(InboxItem.serializer())) ?: emptyList()
         _readLessons.value = read("read_lessons", SetSerializer(String.serializer())) ?: emptySet()
         _suggestions.value = read("suggestions", ListSerializer(SuggestionRecord.serializer())) ?: emptyList()
     }
@@ -81,6 +85,21 @@ object Prefs {
     @Synchronized
     fun updatePaper(f: (PaperPortfolio) -> PaperPortfolio) {
         val v = f(_paper.value); _paper.value = v; write("paper", PaperPortfolio.serializer(), v)
+    }
+
+    private var inboxId = 0L
+
+    @Synchronized
+    fun addInbox(item: InboxItem) {
+        val now = System.currentTimeMillis()
+        inboxId = if (now > inboxId) now else inboxId + 1
+        val v = (listOf(item.copy(id = inboxId)) + _inbox.value).take(300)
+        _inbox.value = v; write("inbox", ListSerializer(InboxItem.serializer()), v)
+    }
+
+    @Synchronized
+    fun updateInbox(f: (List<InboxItem>) -> List<InboxItem>) {
+        val v = f(_inbox.value); _inbox.value = v; write("inbox", ListSerializer(InboxItem.serializer()), v)
     }
 
     fun markLessonRead(id: String) {

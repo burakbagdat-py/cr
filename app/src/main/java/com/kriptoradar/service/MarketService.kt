@@ -87,6 +87,7 @@ class MarketService : LifecycleService() {
                     nm.notify(Notifier.LIVE_ID, Notifier.liveNotification(this, title, parts.ifEmpty { "Favori coin ekleyin" }))
                 } catch (_: SecurityException) {}
             }
+            runCatching { com.kriptoradar.alerts.DailySummary.maybeSend(this@MarketService) }
             delay(5_000)
         }
     }

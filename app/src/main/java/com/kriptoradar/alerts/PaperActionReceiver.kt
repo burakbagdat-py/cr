@@ -27,9 +27,18 @@ class PaperActionReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(Dispatchers.Default).launch {
             try {
+                val casual = Prefs.settings.value.casualMode
+                if (action == ACTION_BUY) {
+                    val (t, x) = try {
+                        val msg = QuickTrade.buy(symbol)
+                        (if (casual) "🛒 Kanka aldık, hayırlı olsun!" else "🛒 Sanal alım yapıldı") to msg
+                    } catch (e: Exception) { "Alım yapılamadı" to (e.message ?: "Hata") }
+                    NotificationManagerCompat.from(ctx).cancel(notifId)
+                    Notifier.post(ctx, Notifier.CH_PAPER, notifId + 1, t, x, symbol)
+                    return@launch
+                }
                 if (PaperExecutor.pricesTry()[symbol] == null) MarketRepository.refreshSnapshot()
                 val price = PaperExecutor.pricesTry()[symbol]
-                val casual = Prefs.settings.value.casualMode
                 val (title, text) = if (price == null) "Fiyat alınamadı" to "İnternet bağlantını kontrol edip tekrar dene."
                 else try {
                     when (action) {
@@ -44,15 +53,8 @@ class PaperActionReceiver : BroadcastReceiver() {
                                 "${Format.price(e.qty)} ${e.base} ${Format.price(price)} TL'den satıldı. Kâr/zarar: ${sign(pnl)} TL"
                         }
                         ACTION_PROTECT -> {
-                            val h = Prefs.paper.value.holdings.firstOrNull { it.symbol == symbol } ?: error("Bu coin artık portföyde yok")
-                            // Kârı koru: fiyat %3 geri gelirse ya da maliyetin altına inerse sat
-                            val stop = maxOf(price * 0.97, h.avgCostTry * 1.003)
-                            Prefs.updatePaper { p ->
-                                val cleaned = p.copy(orders = p.orders.filterNot { it.symbol == symbol && it.kind == OrderKind.STOP_LOSS })
-                                PaperEngine.placeOrder(cleaned, PaperOrder(0, symbol, h.base, OrderKind.STOP_LOSS, stop, fraction = 1.0, createdAt = System.currentTimeMillis()))
-                            }
-                            (if (casual) "🛡️ Kanka kârı kilitledik" else "🛡️ Kâr koruması kuruldu") to
-                                "${h.base} ${Format.price(stop)} TL'nin altına inerse otomatik satılacak. Yükselmeye devam ederse elinde kalır."
+                            val msg = QuickTrade.protect(symbol)
+                            (if (casual) "🛡️ Kanka kârı kilitledik" else "🛡️ Kâr koruması kuruldu") to "$msg Yükselmeye devam ederse elinde kalır."
                         }
                         else -> return@launch
                     }
@@ -76,6 +78,7 @@ class PaperActionReceiver : BroadcastReceiver() {
         const val ACTION_SELL_ALL = "sell_all"
         const val ACTION_SELL_HALF = "sell_half"
         const val ACTION_PROTECT = "protect"
+        const val ACTION_BUY = "buy"
 
         fun intent(ctx: Context, symbol: String, action: String, notifId: Int): PendingIntent =
             PendingIntent.getBroadcast(

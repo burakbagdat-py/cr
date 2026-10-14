@@ -43,6 +43,14 @@ sayaç gibi akan sayılar, kendini çizen grafikler, dolan skor halkaları, yük
   bekleyen emirler (limit alım, limit satış, zarar-kes, kâr-al – uygulama kapalıyken de çalışır ve bildirir),
   komisyon + fiyat kayması, portföy değer grafiği, gerçekleşen/açık kâr-zarar, performans istatistikleri ve tam hesap ekstresi.
 
+**📥 Bildirim kutusu** (üstteki zil, okunmamış sayısıyla): gelen tüm bildirimler uygulamada listelenir; al fırsatlarında **⚡ Al** tek dokunuşla sanal alım yapar
+(aynı düğme bildirimin içinde de var), her kaydın "bildirimden beri" fiyat değişimi görünür. Alarmlar da buradadır.
+
+**📈 Takip** sekmesi: aldığın her coin için koyduğun → şu an, kâr/zarar, başa baş fiyatı, "şimdi satarsan eline geçer", zarar-kes/kâr-al arası konum,
+son 2 saatlik mini grafik, tek dokunuşla sat/kârı koru; kapanan işlemler ve isabet oranı.
+
+**Otomatik koruma**: hızlı alımda zarar-kes (-%5) ve kâr-al (+%10) emirleri otomatik kurulur (ayarlanabilir). **Günlük özet**: 21:00'den sonra günün sanal kâr/zararı.
+
 **🛠 Admin paneli** (Ayarlar → Admin paneli, PIN korumalı): sanal para yükle/çek/ayarla, hediye coin ekle veya sil,
 komisyon ve kayma oranı, emir/hareket/alarm/öneri temizliği, portföy sıfırlama, tüm verinin yedeklenmesi (paylaş/panoya kopyala) ve geri yüklenmesi,
 sistem durumu (servis, canlı bağlantı, son tarama) ve PIN değiştirme.

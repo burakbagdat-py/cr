@@ -12,6 +12,11 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.kriptoradar.R
+import com.kriptoradar.data.InboxItem
+import com.kriptoradar.data.InboxKind
+import com.kriptoradar.data.MarketRepository
+import com.kriptoradar.data.Prefs
+import com.kriptoradar.ui.Format
 import com.kriptoradar.ui.MainActivity
 
 object Notifier {
@@ -22,6 +27,7 @@ object Notifier {
     const val CH_REVERSAL = "reversal"
     const val CH_UPDATE = "updates"
     const val CH_PAPER = "paper"
+    const val CH_SUMMARY = "summary"
     const val LIVE_ID = 1
 
     fun createChannels(ctx: Context) {
@@ -41,6 +47,9 @@ object Notifier {
             },
             NotificationChannel(CH_PAPER, "Sanal portföyüm", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "Sanal olarak aldığın coinler kâra/zarara geçince ya da sert hareket edince"; enableVibration(true)
+            },
+            NotificationChannel(CH_SUMMARY, "Günlük özet", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "Akşam sanal portföyünün gün sonu kâr/zarar özeti"
             },
             NotificationChannel(CH_UPDATE, "Uygulama güncellemeleri", NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = "Yeni sürüm yayınlandığında"
@@ -67,8 +76,25 @@ object Notifier {
     fun post(
         ctx: Context, channel: String, id: Int, title: String, text: String, symbol: String? = null,
         actions: List<Pair<String, PendingIntent>> = emptyList(),
+        buySymbol: String? = null,
+        inbox: Boolean = true,
     ) {
+        // Uygulama içi bildirim kutusuna da yaz (test bildirimleri ve güncellemeler hariç)
+        val kind = when (channel) {
+            CH_SIGNAL -> InboxKind.SIGNAL; CH_REVERSAL -> InboxKind.REVERSAL; CH_MOVE -> InboxKind.MOVE
+            CH_ALERT -> InboxKind.ALERT; CH_PAPER -> InboxKind.PAPER; CH_SUMMARY -> InboxKind.SUMMARY
+            else -> null
+        }
+        if (inbox && kind != null && id !in setOf(9998, 9999)) {
+            val priceSym = buySymbol ?: symbol
+            Prefs.addInbox(InboxItem(0, System.currentTimeMillis(), kind, title, text, symbol, buySymbol,
+                priceSym?.let { MarketRepository.tickers.value[it]?.price } ?: 0.0))
+        }
         if (!canPost(ctx)) return
+        val allActions = if (buySymbol != null)
+            listOf("⚡ Sanal al (${Format.num(Prefs.settings.value.quickBuyAmount)} TL)" to
+                PaperActionReceiver.intent(ctx, buySymbol, PaperActionReceiver.ACTION_BUY, id)) + actions
+        else actions
         val n = NotificationCompat.Builder(ctx, channel)
             .setSmallIcon(R.drawable.ic_stat_radar)
             .setContentTitle(title)
@@ -79,7 +105,7 @@ object Notifier {
             .setWhen(System.currentTimeMillis()).setShowWhen(true)
             .setAutoCancel(true)
             .setContentIntent(openAppIntent(ctx, symbol, update = channel == CH_UPDATE))
-            .apply { actions.forEach { (label, pi) -> addAction(0, label, pi) } }
+            .apply { allActions.take(3).forEach { (label, pi) -> addAction(0, label, pi) } }
             .build()
         try { NotificationManagerCompat.from(ctx).notify(id, n) } catch (_: SecurityException) {}
     }

@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kriptoradar.alerts.PaperExecutor
+import com.kriptoradar.alerts.QuickTrade
+import kotlinx.coroutines.flow.map
 import com.kriptoradar.alerts.ScanRunner
 import com.kriptoradar.data.OrderKind
 import com.kriptoradar.data.PaperEngine
@@ -144,6 +146,29 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun paperClearLedger() = paperOp { it.copy(ledger = emptyList(), equity = emptyList()) }
     fun paperCancelAll() = paperOp { it.copy(orders = emptyList()) }
     fun paperReset(startCash: Double) = paperOp { PaperEngine.reset(it, startCash) }
+
+    // ---------------- Bildirim kutusu + hızlı işlem ----------------
+    val inbox = Prefs.inbox
+    val unread: StateFlow<Int> = Prefs.inbox.map { l -> l.count { !it.read } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+    /** Kısa bilgi mesajları (Toast) için. */
+    val toast = MutableStateFlow<String?>(null)
+
+    fun markInboxRead() = Prefs.updateInbox { l -> if (l.any { !it.read }) l.map { it.copy(read = true) } else l }
+    fun clearInbox() = Prefs.updateInbox { emptyList() }
+    fun deleteInbox(id: Long) = Prefs.updateInbox { l -> l.filterNot { it.id == id } }
+
+    fun quickBuy(symbol: String, amount: Double? = null) {
+        viewModelScope.launch(Dispatchers.Default) {
+            toast.value = try {
+                "🛒 " + if (amount != null) QuickTrade.buy(symbol, amount) else QuickTrade.buy(symbol)
+            } catch (e: Exception) { "Alınamadı: ${e.message}" }
+        }
+    }
+
+    fun protect(symbol: String) {
+        toast.value = try { "🛡️ " + QuickTrade.protect(symbol) } catch (e: Exception) { e.message }
+    }
 
     // ---------------- Admin ----------------
     private val _adminUnlocked = MutableStateFlow(false)

@@ -71,7 +71,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kriptoradar.data.ConnState
 import com.kriptoradar.ui.components.UpdateBanner
 import com.kriptoradar.ui.screens.AdminScreen
-import com.kriptoradar.ui.screens.AlertsScreen
+import com.kriptoradar.ui.screens.InboxScreen
+import com.kriptoradar.ui.screens.TrackScreen
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import com.kriptoradar.ui.screens.CoinDetailScreen
 import com.kriptoradar.ui.screens.LearnScreen
 import com.kriptoradar.ui.screens.MarketScreen
@@ -115,7 +119,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Tab(val label: String) { LEARN("Rehber"), MARKET("Piyasa"), SIGNALS("Sinyaller"), SIM("Simülatör"), ALERTS("Alarmlar") }
+private enum class Tab(val label: String) { LEARN("Rehber"), MARKET("Piyasa"), SIGNALS("Sinyaller"), TRACK("Takip"), SIM("Simülatör") }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -127,7 +131,13 @@ private fun App(vm: MainViewModel, detail: String?, setDetail: (String?) -> Unit
     LaunchedEffect(nav) {
         if (nav == "sim") { tab = Tab.SIM; overlay = null; setDetail(null) }
         if (nav == "admin") { overlay = "admin"; setDetail(null) }
+        if (nav == "inbox") { overlay = "inbox"; setDetail(null) }
         if (nav != null) vm.navRequest.value = null
+    }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val toastMsg by vm.toast.collectAsStateWithLifecycle()
+    LaunchedEffect(toastMsg) {
+        toastMsg?.let { android.widget.Toast.makeText(ctx, it, android.widget.Toast.LENGTH_LONG).show(); vm.toast.value = null }
     }
     BackHandler(enabled = detail != null) { setDetail(null) }
     BackHandler(enabled = detail == null && settings) { overlay = if (overlay == "admin") "settings" else null }
@@ -151,13 +161,21 @@ private fun App(vm: MainViewModel, detail: String?, setDetail: (String?) -> Unit
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                title = { Text(when (overlay) { "settings" -> "Ayarlar"; "admin" -> "Admin Paneli"; else -> "Kripto Radar" }, fontWeight = FontWeight.Bold) },
+                title = { Text(when (overlay) { "settings" -> "Ayarlar"; "admin" -> "Admin Paneli"; "inbox" -> "Bildirimler"; else -> "Kripto Radar" }, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     if (settings) IconButton(onClick = { overlay = if (overlay == "admin") "settings" else null }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri") }
                 },
                 actions = {
                     ConnBadge(vm)
-                    if (!settings) IconButton(onClick = { overlay = "settings" }) { Icon(Icons.Default.Settings, "Ayarlar") }
+                    if (!settings) {
+                        val unread by vm.unread.collectAsStateWithLifecycle()
+                        IconButton(onClick = { overlay = "inbox" }) {
+                            BadgedBox(badge = { if (unread > 0) Badge { Text(if (unread > 99) "99+" else "$unread") } }) {
+                                Icon(Icons.Default.Notifications, "Bildirimler")
+                            }
+                        }
+                        IconButton(onClick = { overlay = "settings" }) { Icon(Icons.Default.Settings, "Ayarlar") }
+                    }
                 },
             )
         },
@@ -173,8 +191,8 @@ private fun App(vm: MainViewModel, detail: String?, setDetail: (String?) -> Unit
                                 Tab.LEARN -> Icons.Default.Info
                                 Tab.MARKET -> Icons.Default.Home
                                 Tab.SIGNALS -> Icons.Default.Star
+                                Tab.TRACK -> Icons.AutoMirrored.Filled.List
                                 Tab.SIM -> Icons.Default.PlayArrow
-                                Tab.ALERTS -> Icons.Default.Notifications
                             }, contentDescription = null)
                         },
                         label = { Text(t.label, fontSize = 11.sp, maxLines = 1) },
@@ -191,7 +209,7 @@ private fun App(vm: MainViewModel, detail: String?, setDetail: (String?) -> Unit
                 targetState = overlay ?: tab.name,
                 modifier = Modifier.weight(1f).fillMaxSize(),
                 transitionSpec = {
-                    val order = listOf("LEARN", "MARKET", "SIGNALS", "SIM", "ALERTS", "settings", "admin")
+                    val order = listOf("LEARN", "MARKET", "SIGNALS", "TRACK", "SIM", "inbox", "settings", "admin")
                     val dir = if (order.indexOf(targetState) >= order.indexOf(initialState)) 1 else -1
                     (slideInHorizontally(tween(340)) { it / 4 * dir } + fadeIn(tween(280)) + scaleIn(tween(340), initialScale = 0.98f)) togetherWith
                         (slideOutHorizontally(tween(300)) { -it / 4 * dir } + fadeOut(tween(200)))
@@ -206,7 +224,8 @@ private fun App(vm: MainViewModel, detail: String?, setDetail: (String?) -> Unit
                         "MARKET" -> MarketScreen(vm, onOpen = setDetail)
                         "SIGNALS" -> SignalsScreen(vm, onOpen = setDetail)
                         "SIM" -> SimulatorScreen(vm, onOpen = setDetail)
-                        else -> AlertsScreen(vm)
+                        "TRACK" -> TrackScreen(vm, onOpen = setDetail)
+                        else -> InboxScreen(vm, onOpen = setDetail)
                     }
                 }
             }

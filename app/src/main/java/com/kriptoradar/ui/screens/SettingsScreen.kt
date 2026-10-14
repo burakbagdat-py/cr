@@ -79,6 +79,16 @@ fun SettingsScreen(vm: MainViewModel, openAdmin: () -> Unit = {}) {
             }) { Text("Test bildirimi gönder") }
         }
 
+        Section("⚡ Hızlı alım ve koruma") {
+            SliderRow("Tek dokunuşla alım tutarı", s.quickBuyAmount.toFloat(), 100f..20_000f, { Format.num(((it / 100).toInt() * 100).toDouble()) + " TL" }) { v ->
+                Prefs.updateSettings { it.copy(quickBuyAmount = ((v / 100).toInt() * 100).toDouble().coerceAtLeast(100.0)) }
+            }
+            ToggleRow("Alırken otomatik koruma", "Her sanal alımda zarar-kes ve kâr-al emri otomatik kurulur", s.autoProtect) { v -> Prefs.updateSettings { it.copy(autoProtect = v) } }
+            SliderRow("Zarar-kes", s.autoStopPct.toFloat(), 1f..30f, { "-%" + it.toInt() }) { v -> Prefs.updateSettings { it.copy(autoStopPct = v.toInt().toDouble()) } }
+            SliderRow("Kâr-al", s.autoTakePct.toFloat(), 1f..100f, { "+%" + it.toInt() }) { v -> Prefs.updateSettings { it.copy(autoTakePct = v.toInt().toDouble()) } }
+            ToggleRow("Akşam günlük özet", "21:00'den sonra günün sanal kâr/zararı bildirilir", s.dailySummary) { v -> Prefs.updateSettings { it.copy(dailySummary = v) } }
+        }
+
         Section("🎮 Sanal portföy bildirimleri") {
             ToggleRow("Aldığım coinler için bildir", "Kâra/zarara geçince ya da sert hareket edince; bildirimden direkt satabilirsin", s.paperNotify) { v -> Prefs.updateSettings { it.copy(paperNotify = v) } }
             SliderRow("Kâr bildirimi her", s.paperProfitStepPct.toFloat(), 1f..25f, { "+%" + it.toInt() }) { v -> Prefs.updateSettings { it.copy(paperProfitStepPct = v.toInt().toDouble()) } }

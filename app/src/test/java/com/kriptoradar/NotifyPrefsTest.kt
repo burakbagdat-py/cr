@@ -34,3 +34,14 @@ class NotifyPrefsTest {
         println(Voice.signals(listOf(Triple("INJ", 78, 6.2), Triple("FIL", 66, 3.1))))
     }
 }
+
+class InboxTest {
+    @Test fun inboxRoundTripAndNewSettingDefaults() {
+        val item = com.kriptoradar.data.InboxItem(1, 2, com.kriptoradar.data.InboxKind.REVERSAL, "t", "x", "SOLUSDT", "SOLUSDT", 150.0)
+        val back = Http.json.decodeFromString(com.kriptoradar.data.InboxItem.serializer(),
+            Http.json.encodeToString(com.kriptoradar.data.InboxItem.serializer(), item))
+        assertTrue(back == item)
+        val s = Http.json.decodeFromString(Settings.serializer(), """{"casualMode":true}""")
+        assertTrue(s.casualMode && s.autoProtect && s.quickBuyAmount == 1000.0 && s.dailySummary)
+    }
+}
