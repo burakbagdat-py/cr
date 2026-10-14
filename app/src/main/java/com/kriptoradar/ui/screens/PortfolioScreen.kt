@@ -33,6 +33,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -78,29 +79,51 @@ fun PortfolioTab(vm: MainViewModel, onOpen: (String) -> Unit) {
     val stats = remember(p.ledger) { PaperEngine.stats(p) }
     var trade by remember { mutableStateOf<Pair<String?, Boolean>?>(null) } // (sembol, alım mı)
     var showAllLedger by rememberSaveable { mutableStateOf(false) }
+    var resetDialog by remember { mutableStateOf(false) }
+    val today = remember(p.equity, equity) { PaperEngine.pnlChangeSince(p, equity, System.currentTimeMillis(), 24 * 3_600_000L) }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
-            Card(Modifier.fillMaxWidth()) {
+            Card(Modifier.fillMaxWidth().enterAnim(0)) {
                 Column(Modifier.padding(14.dp)) {
-                    Text("🎮 Sanal Portföy", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text("Gerçek para yok; gerçek fiyatlarla al-sat, emir ver, kendini test et.", fontSize = 12.sp, color = Muted)
-                    Spacer(Modifier.height(8.dp))
-                    Text("Toplam değer", fontSize = 11.sp, color = Muted)
-                    AnimatedNumber(equity, { tl(it) }, fontSize = 30.sp, fontWeight = FontWeight.Bold, color = changeColor(pnl))
-                    Text("${if (pnl >= 0) "Kâr" else "Zarar"}: ${signedTl(pnl)} (${Format.signedPct(if (p.totalDeposited > 0) pnl / p.totalDeposited * 100 else 0.0)})",
-                        color = changeColor(pnl), fontWeight = FontWeight.SemiBold)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("🎮 Sanal Portföy", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text("Gerçek para yok; gerçek fiyatlarla dene.", fontSize = 12.sp, color = Muted)
+                        }
+                        TextButton(onClick = { resetDialog = true }) { Text("♻️ Sıfırla", color = Down) }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    // Net özet: ne koydun, şimdi ne var, ne kazandın
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        BigTile("💵 Yatırdığın", p.totalDeposited, Color.White, Modifier.weight(1f))
+                        Text("→", fontSize = 20.sp, color = Muted)
+                        BigTile("📊 Şu an", equity, changeColor(pnl), Modifier.weight(1f))
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Card(Modifier.fillMaxWidth(), tint = changeColor(pnl).copy(alpha = 0.16f)) {
+                        Column(Modifier.fillMaxWidth().padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(if (pnl >= 0) "🏆 Kazancın" else "📉 Kaybın", fontSize = 13.sp, color = Muted)
+                            AnimatedNumber(pnl, { signedTl(it) }, fontSize = 32.sp, fontWeight = FontWeight.Bold, color = changeColor(pnl))
+                            AnimatedNumber(if (p.totalDeposited > 0) pnl / p.totalDeposited * 100 else 0.0, { Format.signedPct(it) },
+                                fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = changeColor(pnl))
+                            today?.let {
+                                Text("Son 24 saatte: ${signedTl(it)}", fontSize = 12.sp, color = changeColor(it), modifier = Modifier.padding(top = 4.dp))
+                            }
+                        }
+                    }
                     val points = p.equity.map { it.value } + equity
-                    if (points.size >= 3) Sparkline(points, Modifier.fillMaxWidth().height(70.dp).padding(vertical = 8.dp))
+                    if (points.size >= 3) Sparkline(points, Modifier.fillMaxWidth().height(64.dp).padding(vertical = 8.dp))
+                    Spacer(Modifier.height(6.dp))
+                    Text("Kazancın nereden geliyor?", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    SplitRow("Satıp cebe koyduğun", p.realizedPnl)
+                    SplitRow("Elindeki coinlerde (henüz satmadın)", unrealized)
+                    SplitRow("Ödediğin komisyon (dahil)", -p.feesPaid, muted = true)
+                    Spacer(Modifier.height(6.dp))
                     Row(Modifier.fillMaxWidth()) {
                         Kv2("Nakit", tl(p.cash), Modifier.weight(1f))
                         Kv2("Coinlerde", tl(equity - p.cash), Modifier.weight(1f))
-                        Kv2("Net yatırılan", tl(p.totalDeposited), Modifier.weight(1f))
-                    }
-                    Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
-                        Kv2("Gerçekleşen K/Z", signedTl(p.realizedPnl), Modifier.weight(1f), changeColor(p.realizedPnl))
-                        Kv2("Açık pozisyon K/Z", signedTl(unrealized), Modifier.weight(1f), changeColor(unrealized))
-                        Kv2("Ödenen komisyon", tl(p.feesPaid), Modifier.weight(1f))
+                        Kv2("Başlangıç", tl(p.startCash), Modifier.weight(1f))
                     }
                     Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { trade = null to true }) { Text("🛒 Al") }
@@ -121,12 +144,13 @@ fun PortfolioTab(vm: MainViewModel, onOpen: (String) -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f).bouncyClick { onOpen(h.symbol) }) {
                             Text(h.base, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                            Text("${Format.price(h.qty)} adet • ort. maliyet ${Format.price(h.avgCostTry)} TL", fontSize = 11.sp, color = Muted)
+                            Text("${Format.price(h.qty)} adet • ort. alış ${Format.price(h.avgCostTry)} TL", fontSize = 11.sp, color = Muted)
                             Text("Şu an ${price?.let { Format.price(it) + " TL" } ?: "—"}", fontSize = 11.sp, color = Muted)
+                            Text("${tl(h.costTry)} koydun → ${tl(value)}", fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 2.dp))
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             AnimatedNumber(value, { tl(it) }, fontWeight = FontWeight.SemiBold)
-                            Text(signedTl(hp), fontSize = 12.sp, color = changeColor(hp))
+                            Text((if (hp >= 0) "Kazanç " else "Kayıp ") + signedTl(hp), fontSize = 12.sp, color = changeColor(hp), fontWeight = FontWeight.SemiBold)
                             PctPill(if (h.costTry > 0) hp / h.costTry * 100 else 0.0)
                         }
                     }
@@ -177,6 +201,32 @@ fun PortfolioTab(vm: MainViewModel, onOpen: (String) -> Unit) {
 
     trade?.let { (sym, isBuy) -> TradeDialog(vm, sym, isBuy) { trade = null } }
 
+    if (resetDialog) {
+        var start by remember { mutableStateOf(p.startCash.toLong().toString()) }
+        AlertDialog(
+            onDismissRequest = { resetDialog = false },
+            title = { Text("♻️ Sanal parayı sıfırla") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Tüm sanal coinler, emirler ve geçmiş silinir; seçtiğin tutarla temiz bir sayfa açılır.", fontSize = 13.sp)
+                    OutlinedTextField(start, { start = it.filter(Char::isDigit) }, label = { Text("Başlangıç parası (TL)") }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(1_000L, 10_000L, 50_000L, 100_000L).forEach { a ->
+                            FilterChip(selected = start == a.toString(), onClick = { start = a.toString() }, label = { Text(Format.compact(a.toDouble())) })
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.paperReset((start.toDoubleOrNull() ?: 10_000.0).coerceIn(100.0, 100_000_000.0)); resetDialog = false
+                }) { Text("Sıfırla", color = Down) }
+            },
+            dismissButton = { TextButton(onClick = { resetDialog = false }) { Text("Vazgeç") } },
+        )
+    }
+
     // Kârlı satış kutlaması
     val party by vm.celebrate.collectAsStateWithLifecycle()
     ConfettiBurst(party?.first)
@@ -197,6 +247,22 @@ fun PortfolioTab(vm: MainViewModel, onOpen: (String) -> Unit) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun BigTile(label: String, value: Double, color: Color, modifier: Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, fontSize = 12.sp, color = Muted)
+        AnimatedNumber(value, { tl(it) }, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = color)
+    }
+}
+
+@Composable
+private fun SplitRow(label: String, v: Double, muted: Boolean = false) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Text("• $label", Modifier.weight(1f), fontSize = 12.sp, color = Muted)
+        Text(signedTl(v), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (muted) Muted else changeColor(v))
     }
 }
 

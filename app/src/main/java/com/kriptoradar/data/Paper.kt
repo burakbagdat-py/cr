@@ -56,7 +56,7 @@ data class PaperOrder(
 )
 
 @Serializable
-data class EquityPoint(val at: Long, val value: Double)
+data class EquityPoint(val at: Long, val value: Double, val deposited: Double = -1.0)
 
 @Serializable
 data class PaperPortfolio(

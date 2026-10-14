@@ -95,3 +95,22 @@ class PaperEngineTest {
         assertEquals(LedgerType.BUY, PaperEngine.buy(p, "ETHUSDT", "ETH", 120_000.0, 100.0).ledger.first().type)
     }
 }
+
+class PaperNotifyTest {
+    @Test fun todayPnlIgnoresDeposits() {
+        val now = 100L * 3_600_000L
+        var p = PaperPortfolio(feePct = 0.0, slippagePct = 0.0)
+        p = PaperEngine.recordEquity(p, 10_000.0, now - 25 * 3_600_000L)          // dün: 10.000, yatırılan 10.000
+        p = PaperEngine.deposit(p, 5_000.0)                                        // bugün 5.000 yüklendi
+        // şimdi değer 15.600 → gerçek kazanç 600 (5.000 yükleme kâr sayılmamalı)
+        assertEquals(600.0, PaperEngine.pnlChangeSince(p, 15_600.0, now, 24 * 3_600_000L)!!, 1e-9)
+    }
+
+    @Test fun printPaperMessages() {
+        val m = com.kriptoradar.alerts.PaperMoney("SOL", 1000.0, 1100.0, 100.0, 10.0, 6000.0)
+        println(com.kriptoradar.alerts.Voice.paperProfit(true, m, com.kriptoradar.alerts.PaperExecutor.Momentum.RISING_STRONG, 0.1))
+        println(com.kriptoradar.alerts.Voice.paperProfit(true, m, com.kriptoradar.alerts.PaperExecutor.Momentum.RISING_FADING, 1.4))
+        println(com.kriptoradar.alerts.Voice.paperProfit(false, m, com.kriptoradar.alerts.PaperExecutor.Momentum.RISING_FADING, 1.4))
+        println(com.kriptoradar.alerts.Voice.paperLoss(true, m.copy(value = 920.0, pnl = -80.0, pct = -8.0)))
+    }
+}

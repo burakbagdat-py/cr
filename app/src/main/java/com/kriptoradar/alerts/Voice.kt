@@ -77,4 +77,47 @@ object Voice {
         else -> (if (pnl >= 0) pick("🎯 Kanka kârı aldık!", "💰 Kanka $base sattık, para cepte") else "💱 Kanka $base satıldı") to
             "$base $price TL'den satıldı, ${if (pnl >= 0) "+" else ""}${Format.num(pnl)} TL (sanal)."
     }
+
+    // ---------------- Sanal portföy ----------------
+    private fun tl(v: Double) = Format.num(v) + " TL"
+    private fun sgn(v: Double) = (if (v >= 0) "+" else "") + Format.num(v) + " TL"
+    private fun summary(m: PaperMoney) = "${tl(m.invested)} koydun → şu an ${tl(m.value)} (${sgn(m.pnl)}, ${Format.signedPct(m.pct)})"
+
+    fun paperProfit(casual: Boolean, m: PaperMoney, mo: PaperExecutor.Momentum, offHigh: Double): Pair<String, String> {
+        val hint = when (mo) {
+            PaperExecutor.Momentum.RISING_STRONG -> if (casual)
+                pick("Hâlâ tırmanıyo! 5 dk daha yükselsin, sonra sat. Garanti istersen \"Kârı koru\"ya bas, düşerse ben satarım.",
+                    "Daha durmadı amk, biraz daha bekle. \"Kârı koru\" dersen geri dönerse otomatik satarım.")
+            else "Yükseliş sürüyor. Beklemek istersen \"Kârı koru\" ile geri dönüşte otomatik satış kurabilirsin."
+            PaperExecutor.Momentum.RISING_FADING -> if (casual)
+                "Ama hız kesti, zirveden %${Format.num(offHigh)} geri geldi. Bence kârı al kanka, açgözlü olma."
+            else "Yükseliş yavaşlıyor (son zirveden %${Format.num(offHigh)} geride). Kârı almayı düşünebilirsin."
+            PaperExecutor.Momentum.FALLING -> if (casual) "Şu an geri çekiliyo, kârı kaçırma kanka." else "Fiyat şu an geri çekiliyor; kârın erimeden karar ver."
+        }
+        val title = if (casual) pick("🚀 Lan aldığın ${m.base} uçuyo, bak şuraya!", "💰 Kanka ${m.base} seni kâra soktu!", "🔥 ${m.base} coştu kanka, kârdasın!")
+        else "💰 ${m.base} kârda: ${Format.signedPct(m.pct)}"
+        return title to "${summary(m)}\n$hint\n(Sanal portföy)"
+    }
+
+    fun paperLoss(casual: Boolean, m: PaperMoney): Pair<String, String> {
+        val title = if (casual) pick("📉 Kanka ${m.base} seni yaktı", "🩸 Kanka ${m.base} düşüyo, zarardasın", "⚠️ Kanka ${m.base} kötü gidiyo")
+        else "📉 ${m.base} zararda: ${Format.signedPct(m.pct)}"
+        val hint = if (casual) "Ya şimdi kes ya da planın neyse ona sadık kal. Daha da düşerse canın yanmasın."
+        else "Zararı sınırlamak için satabilir ya da zarar-kes emri koyabilirsin."
+        return title to "${summary(m)}\n$hint\n(Sanal portföy)"
+    }
+
+    fun paperMove(casual: Boolean, m: PaperMoney, c5: Double, mo: PaperExecutor.Momentum, offHigh: Double): Pair<String, String> {
+        val upMove = c5 > 0
+        val title = if (casual) {
+            if (upMove) pick("🚀 Lan aldığın ${m.base} uçuyo!", "📈 Kanka ${m.base} kalkıyo, bak bak!")
+            else pick("🔻 Kanka aldığın ${m.base} çakılıyo!", "😱 Kanka ${m.base} düşüyo, bak!")
+        } else "${if (upMove) "📈" else "📉"} Elindeki ${m.base} 5 dk'da ${Format.signedPct(c5)}"
+        val hint = when {
+            upMove && mo == PaperExecutor.Momentum.RISING_STRONG -> if (casual) "5 dk daha yükselsin, sonra sat. Ya da \"Kârı koru\"ya bas." else "Yükseliş sürüyor."
+            upMove -> if (casual) "Hız kesiyo (zirveden %${Format.num(offHigh)} geride), kârı düşün." else "Yükseliş yavaşlıyor."
+            else -> if (casual) "Çabuk bak, istersen çık." else "Zararı sınırlamak için satmayı düşünebilirsin."
+        }
+        return title to "5 dakikada ${Format.signedPct(c5)}. ${summary(m)}\n$hint\n(Sanal portföy)"
+    }
 }

@@ -72,6 +72,14 @@ data class Settings(
     val onlySelectedCoins: Boolean = false,
     /** Seçili coinler (BTC, ETH gibi taban sembolleri). */
     val notifyCoins: Set<String> = emptySet(),
+    /** Sanal portföydeki coinler için kâr/zarar ve hareket bildirimleri. */
+    val paperNotify: Boolean = true,
+    /** Her +X%'lik kâr basamağında bildir (+5, +10, +15...). */
+    val paperProfitStepPct: Double = 5.0,
+    /** Her -X%'lik zarar basamağında uyar. */
+    val paperLossStepPct: Double = 5.0,
+    /** Elindeki coin 5 dakikada bu kadar oynarsa haber ver. */
+    val paperMovePct: Double = 2.0,
 ) {
     fun allows(base: String) = !onlySelectedCoins || base in notifyCoins
 }

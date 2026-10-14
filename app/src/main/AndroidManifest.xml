@@ -52,6 +52,10 @@
         </provider>
 
         <receiver
+            android:name=".alerts.PaperActionReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".service.BootReceiver"
             android:exported="true">
             <intent-filter>

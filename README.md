@@ -37,7 +37,9 @@ sayaç gibi akan sayılar, kendini çizen grafikler, dolan skor halkaları, yük
 **💰 Simülatör**
 - *Ne olurdu?*: "X TL ile kaç BTC alırım" (komisyon dahil), %10/%50 senaryoları; 1 hafta–2 yıl önce koysaydın bugünkü değeri ve arada düştüğü en kötü değer;
   tek seferde vs. haftalık parça parça (DCA) karşılaştırması; **Monte Carlo simülasyonu** (geçmiş günlük getirilerden 2000 olası gelecek, 60 tanesi animasyonla akar, ardından %10–%90 ihtimal yelpazesi); geçmiş 2 yıllık dağılıma göre 1 gün/1 hafta/1 ay/3 ay sonra zarar ihtimali ve kötü/orta/iyi senaryolar. TL hesapları günlük dolar/TL kuruyla yapılır.
-- *Sanal Portföy*: Sanal TL ile gerçek fiyatlardan al-sat. Ortalama maliyetli varlıklar, kısmi satış (%25/50/75/100),
+- *Sanal Portföy*: Net "Yatırdığın → Şu an → Kazancın" özeti (son 24 saat dahil, para yükleme kâr sayılmaz), coin bazında "X TL koydun → Y TL",
+  ekranda tek dokunuşla sıfırlama. Aldığın coinler için kâr/zarar basamağı ve 5 dakikalık sert hareket bildirimleri; bildirim kısa vadeli ivmeye göre
+  "hâlâ yükseliyor / hız kesti" der ve içinden **Hepsini sat / Yarısını sat / Kârı koru** yapılabilir. Sanal TL ile gerçek fiyatlardan al-sat. Ortalama maliyetli varlıklar, kısmi satış (%25/50/75/100),
   bekleyen emirler (limit alım, limit satış, zarar-kes, kâr-al – uygulama kapalıyken de çalışır ve bildirir),
   komisyon + fiyat kayması, portföy değer grafiği, gerçekleşen/açık kâr-zarar, performans istatistikleri ve tam hesap ekstresi.
 

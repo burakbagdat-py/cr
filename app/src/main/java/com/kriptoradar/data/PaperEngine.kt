@@ -185,7 +185,16 @@ object PaperEngine {
     fun recordEquity(p: PaperPortfolio, value: Double, now: Long, everyMs: Long = 15 * 60_000L): PaperPortfolio {
         val last = p.equity.lastOrNull()
         if (last != null && now - last.at < everyMs && abs(last.value - value) < 0.01 * value) return p
-        return p.copy(equity = (p.equity + EquityPoint(now, value)).takeLast(MAX_EQUITY))
+        return p.copy(equity = (p.equity + EquityPoint(now, value, p.totalDeposited)).takeLast(MAX_EQUITY))
+    }
+
+    /**
+     * [msAgo] önceye göre kâr/zarar değişimi (para yükleme/çekme hariç). Kayıt yoksa null.
+     */
+    fun pnlChangeSince(p: PaperPortfolio, equityNow: Double, now: Long, msAgo: Long): Double? {
+        val target = now - msAgo
+        val then = p.equity.lastOrNull { it.at <= target && it.deposited >= 0 } ?: return null
+        return (equityNow - p.totalDeposited) - (then.value - then.deposited)
     }
 
     data class Stats(val sells: Int, val wins: Int, val best: LedgerEntry?, val worst: LedgerEntry?, val buys: Int)

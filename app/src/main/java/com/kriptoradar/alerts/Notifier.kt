@@ -21,6 +21,7 @@ object Notifier {
     const val CH_SIGNAL = "signals"
     const val CH_REVERSAL = "reversal"
     const val CH_UPDATE = "updates"
+    const val CH_PAPER = "paper"
     const val LIVE_ID = 1
 
     fun createChannels(ctx: Context) {
@@ -37,6 +38,9 @@ object Notifier {
             },
             NotificationChannel(CH_REVERSAL, "Dip dönüş adayları", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "Çok düşmüş ama yükselişe dönme eğilimi gösteren coinler (tavsiye değildir)"
+            },
+            NotificationChannel(CH_PAPER, "Sanal portföyüm", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Sanal olarak aldığın coinler kâra/zarara geçince ya da sert hareket edince"; enableVibration(true)
             },
             NotificationChannel(CH_UPDATE, "Uygulama güncellemeleri", NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = "Yeni sürüm yayınlandığında"
@@ -60,7 +64,10 @@ object Notifier {
     fun canPost(ctx: Context) = Build.VERSION.SDK_INT < 33 ||
         ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
-    fun post(ctx: Context, channel: String, id: Int, title: String, text: String, symbol: String? = null) {
+    fun post(
+        ctx: Context, channel: String, id: Int, title: String, text: String, symbol: String? = null,
+        actions: List<Pair<String, PendingIntent>> = emptyList(),
+    ) {
         if (!canPost(ctx)) return
         val n = NotificationCompat.Builder(ctx, channel)
             .setSmallIcon(R.drawable.ic_stat_radar)
@@ -72,6 +79,7 @@ object Notifier {
             .setWhen(System.currentTimeMillis()).setShowWhen(true)
             .setAutoCancel(true)
             .setContentIntent(openAppIntent(ctx, symbol, update = channel == CH_UPDATE))
+            .apply { actions.forEach { (label, pi) -> addAction(0, label, pi) } }
             .build()
         try { NotificationManagerCompat.from(ctx).notify(id, n) } catch (_: SecurityException) {}
     }

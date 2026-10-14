@@ -79,6 +79,18 @@ fun SettingsScreen(vm: MainViewModel, openAdmin: () -> Unit = {}) {
             }) { Text("Test bildirimi gönder") }
         }
 
+        Section("🎮 Sanal portföy bildirimleri") {
+            ToggleRow("Aldığım coinler için bildir", "Kâra/zarara geçince ya da sert hareket edince; bildirimden direkt satabilirsin", s.paperNotify) { v -> Prefs.updateSettings { it.copy(paperNotify = v) } }
+            SliderRow("Kâr bildirimi her", s.paperProfitStepPct.toFloat(), 1f..25f, { "+%" + it.toInt() }) { v -> Prefs.updateSettings { it.copy(paperProfitStepPct = v.toInt().toDouble()) } }
+            SliderRow("Zarar uyarısı her", s.paperLossStepPct.toFloat(), 1f..25f, { "-%" + it.toInt() }) { v -> Prefs.updateSettings { it.copy(paperLossStepPct = v.toInt().toDouble()) } }
+            SliderRow("5 dakikalık sert hareket", s.paperMovePct.toFloat(), 0.5f..10f, { "%" + Format.num(it.toDouble()) }) { v -> Prefs.updateSettings { it.copy(paperMovePct = v.toDouble()) } }
+            OutlinedButton(onClick = {
+                val m = com.kriptoradar.alerts.PaperMoney("BTC", 1000.0, 1080.0, 80.0, 8.0, 4_200_000.0)
+                val (title, text) = com.kriptoradar.alerts.Voice.paperProfit(s.casualMode, m, com.kriptoradar.alerts.PaperExecutor.Momentum.RISING_STRONG, 0.1)
+                com.kriptoradar.alerts.Notifier.post(ctx, com.kriptoradar.alerts.Notifier.CH_PAPER, 9998, title, text + " – test", "BTCUSDT")
+            }) { Text("Örnek bildirim gönder") }
+        }
+
         Section("Hangi coinler için bildirim?") {
             ToggleRow("Sadece seçtiğim coinler", "Ani hareket, sinyal, dip dönüş ve hacim bildirimleri sadece aşağıdaki coinler için gelir. Fiyat alarmların her zaman çalışır.", s.onlySelectedCoins) { v ->
                 Prefs.updateSettings { it.copy(onlySelectedCoins = v) }
